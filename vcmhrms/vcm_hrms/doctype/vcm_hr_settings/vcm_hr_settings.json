@@ -7,8 +7,8 @@
  "field_order": [
   "vcm_hr_settings_section",
   "attendance_locked_upto",
-  "late_checkin_lookback_days",
   "repair_window_days",
+  "allowed_late_entry_count",
   "column_break_ptio",
   "last_repair_run_at"
  ],
@@ -17,12 +17,6 @@
    "fieldname": "attendance_locked_upto",
    "fieldtype": "Date",
    "label": "Attendance Locked Upto"
-  },
-  {
-   "default": "4",
-   "fieldname": "late_checkin_lookback_days",
-   "fieldtype": "Int",
-   "label": "Late Checkin Lookback Days"
   },
   {
    "fieldname": "vcm_hr_settings_section",
@@ -43,13 +37,19 @@
    "fieldname": "last_repair_run_at",
    "fieldtype": "Datetime",
    "label": "Last Repair Run At"
+  },
+  {
+   "default": "3",
+   "fieldname": "allowed_late_entry_count",
+   "fieldtype": "Int",
+   "label": "Allowed Late Entry Count"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-16 15:11:00.182187",
+ "modified": "2026-02-27 15:32:05.770673",
  "modified_by": "Administrator",
  "module": "VCM HRMS",
  "name": "VCM HR Settings",
