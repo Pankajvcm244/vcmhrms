@@ -133,6 +133,7 @@ class VCMShiftType(HRMSShiftType):
          # 2) Now HRMS sees those checkins as unlinked and will recreate attendance immediately
         super().process_auto_attendance(is_manually_triggered=False)
         
+        
 
     def reconcile_late_checkins(self):
         """
@@ -278,9 +279,7 @@ class VCMShiftType(HRMSShiftType):
                 # logger.debug(f"cancelling  {attendance.name}")
             # Unlink day’s checkins so HRMS reprocesses them in the subsequent super().process_auto_attendance()
             _unlink_day_checkins(employee, adate)  
-        frappe.db.commit()
-
-    
+        frappe.db.commit()   
 
     
     # Override has_incorrect_shift_config() to allow running

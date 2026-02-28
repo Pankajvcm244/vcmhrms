@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import get_datetime, getdate, add_days, flt, cint
+from frappe.utils import get_datetime, getdate, add_days, flt, cint, nowdate
 from datetime import datetime, timedelta, time as pytime
 import logging
 logger = logging.getLogger(__name__)
@@ -218,6 +218,9 @@ def apply_nonflex_strict_hours(doc, method=None):
       - Never override Absent
       - Early exit stays Half Day (policy hook will enforce too)
     """
+    # Ignore attendance created by sandwich logic to prevent conflicts. Those should be already marked Absent and we don't want to mess with them.
+    if cint(getattr(doc, "custom_created_by_sandwich", 0) or 0):
+        return
     # Ignore cancelled
     if getattr(doc, "docstatus", 0) == 2:
         return
@@ -387,6 +390,9 @@ def enforce_late_entry_policy(doc, method=None):
       - HRMS already computed late_entry / early_exit on this Attendance
       - If you clamp in/out times, do that BEFORE this hook, but do not break HRMS late_entry semantics.
     """
+    # Ignore attendance created by sandwich logic to prevent conflicts. Those should be already marked Absent and we don't want to mess with them.
+    if cint(getattr(doc, "custom_created_by_sandwich", 0) or 0):
+        return
     logger.debug(
         f"[LATE-POLICY] Evaluating {doc.name} status={doc.status} "
         f"late_entry={getattr(doc,'late_entry',None)} early_exit={getattr(doc,'early_exit',None)} "
@@ -530,3 +536,4 @@ def enforce_late_entry_policy(doc, method=None):
         if hasattr(doc, "half_day_status") and not doc.half_day_status:
             doc.half_day_status = "Absent"
         logger.debug(f"[LATE-POLICY] Late quota exceeded => downgraded Present to Half Day. att={doc.name}")
+
