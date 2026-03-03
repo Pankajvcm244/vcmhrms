@@ -387,6 +387,12 @@ def apply_nonflex_strict_hours(doc, method=None):
         )[0][0] or 0
         if used_other < allowed:
             allow_relaxation = 1
+        else:
+             # Quota exhausted → reset flag immediately
+            logger.debug(
+                f"[STRICT-HOURS] Quota exhausted. Resetting custom_late_entry_within_grace for {doc.name}"
+            )
+            doc.custom_late_entry_within_grace = 0
     if allow_relaxation:
         required_first_half_hours = max(0, required_first_half_hours - late_grace / 60)
     first_half_done = 1 if first_half_hours >= required_first_half_hours else 0
