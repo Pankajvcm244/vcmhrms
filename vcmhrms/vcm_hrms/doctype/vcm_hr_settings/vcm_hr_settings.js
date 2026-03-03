@@ -25,13 +25,25 @@ frappe.ui.form.on("VCM HR Settings", {
                         const r = await frappe.call({
                             method: "vcmhrms.vcm_hrms.overrides.VCMShiftType.run_auto_attendance_now",
                             args: {
-                            // optional: employee: "HP1671"
+                            // employee: "HP1671"
                             },
                         });
-
-                        const out = r.message || {};
+                        console.log("Auto Attendance Response:", r);
+                        if (!r.message || !r.message.ok) {
+                            frappe.msgprint({
+                                title: __("Auto Attendance Failed"),
+                                message: __("No attendance processed."),
+                                indicator: "red"
+                            });
+                            return;
+                        }
                         frappe.msgprint({
-                            title: __("Auto Attendance Completed"),
+                            title: __("Auto Attendance Completed now"),
+                            message: __(
+                                "Processed: {0} shifts",
+                                [r.message.processed || 0]
+                            ),
+                            indicator: "green"
                         });
 
                         frm.reload_doc();
@@ -54,9 +66,21 @@ frappe.ui.form.on("VCM HR Settings", {
                             },
                         });
 
-                        const out = r.message || {};
+                        if (!r.message || !r.message.ok) {
+                            frappe.msgprint({
+                                title: __("Sandwich Leave Failed"),
+                                message: __("No sandwich leave processed."),
+                                indicator: "red"
+                            });
+                            return;
+                        }
                         frappe.msgprint({
                             title: __("Sandwich Leave Completed"),
+                            message: __(
+                                "Processed: {0} sandwich leaves",
+                                [r.message.processed || 0]
+                            ),
+                            indicator: "green"
                         });
                         frm.reload_doc();
                     } finally {
