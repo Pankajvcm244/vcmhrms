@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
-from frappe.utils import getdate, nowdate, add_days, now_datetime, get_datetime, cint, flt
+from frappe.utils import getdate, nowdate, add_days, now_datetime, get_datetime, cint, flt, today
 import logging
 from datetime import datetime, timedelta, time as pytime
 from hrms.hr.doctype.shift_type.shift_type import ShiftType as HRMSShiftType
@@ -55,19 +55,34 @@ class VCMShiftType(HRMSShiftType):
             Routine scan lower bound:
             max( locked_upto + 1, today - repair_days, process_attendance_after )
         """
-        # logger.debug(f" in get_effective_checkin_start_date")       
-        locked_upto, repair_days, _last_run = get_company_lock_and_windows()
-        start = add_days(getdate(nowdate()), -repair_days)
-        if locked_upto:
-            lock_start = add_days(locked_upto, 1)
-            if lock_start > start:
-                start = lock_start
-        # Also respect HRMS process_attendance_after (if newer)
-        if self.process_attendance_after:
-            pa = getdate(self.process_attendance_after)
-            if pa > start:
-                start = pa
-        return start
+        # logger.debug(f" in get_effective_checkin_start_date") 
+        settings = frappe.get_cached_doc("VCM HR Settings")
+        today_date = getdate(today())
+        # shift configured start
+        shift_start = getdate(self.process_attendance_after) if self.process_attendance_after else None
+        # payroll lock boundary
+        lock_date = settings.attendance_locked_upto
+        lock_start = add_days(getdate(lock_date), 1) if lock_date else None
+
+        # repair window
+        repair_days = cint(getattr(settings, "repair_window_days", 3) or 0)
+        repair_start = add_days(today_date, -repair_days) if repair_days else None
+        # CRITICAL: do not allow repair to cross payroll lock
+        # ensure repair window never crosses payroll lock
+        if repair_start and lock_start and getdate(repair_start) < getdate(lock_start):
+            repair_start = lock_start
+
+        candidates = [getdate(d) for d in [shift_start, lock_start, repair_start] if d]
+        # logger.debug(f"Computed for shift {self.name}: \n"
+        #              f"    shift_start={shift_start} \n"
+        #              f"    lock_start={lock_start} \n"
+        #              f"    repair_start={repair_start}")  
+        if candidates:
+            # logger.debug(f"Effective checkin start date candidates for shift {self.name}: {candidates}, selected: {max(candidates)}")   
+            return max(candidates)
+        # safe fallback
+        return add_days(today_date, -7)
+       
 
     def get_employee_checkins(self) -> list[dict]:
         """

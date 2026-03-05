@@ -11,10 +11,19 @@
 // --------------------------------------------------------------
 frappe.ui.form.on("VCM HR Settings", {
 	refresh(frm) {
+        frm.clear_custom_buttons();
         // Show only for System Manager / HR Manager type roles (adjust as needed)
-        if (!frappe.user.has_role("System Manager") && !frappe.user.has_role("HR Manager")) {
-            return;
+        const allowed =
+            frappe.user.has_role("System Manager") ||
+            frappe.user.has_role("HR Manager");
+        if (!allowed) return;
+        // Only show buttons in Draft
+        if (frm.doc.docstatus !== 0) return;
+
+        if (!frappe.user.has_role("System Manager")) {
+            frm.set_df_property("attendance_locked_upto", "read_only", 1);
         }
+        update_repair_days_limit(frm);
 
         frm.add_custom_button(__("Run Auto Attendance Now"), () => {
             frappe.confirm(
@@ -90,4 +99,46 @@ frappe.ui.form.on("VCM HR Settings", {
             );
         });
     },
+    attendance_locked_upto(frm) {
+        update_repair_days_limit(frm);
+    },
+    repair_window_days(frm) {
+        enforce_repair_days_limit(frm);
+    }
 });
+
+function update_repair_days_limit(frm) {
+    // compute max allowed window
+    if (!frm.doc.attendance_locked_upto) {
+        return;
+    }
+    const today = frappe.datetime.get_today();
+    const lock_date = frm.doc.attendance_locked_upto;
+    const lock_plus_one = frappe.datetime.add_days(lock_date, 1);
+    const max_days = Math.max(
+        0,
+        frappe.datetime.get_diff(today, lock_plus_one)
+    );
+    frm._max_repair_days = max_days;
+    frm.set_df_property("repair_window_days","max_value",max_days);
+    enforce_repair_days_limit(frm);
+}
+
+function enforce_repair_days_limit(frm) {
+    // clamp user input
+    if (frm._max_repair_days === undefined) {
+        return;
+    }
+    let val = frm.doc.repair_window_days || 0;
+    if (val > frm._max_repair_days) {
+        frappe.msgprint({
+            title: __("Repair Window Limited"),
+            message: __(
+                "Repair days cannot exceed <b>{0}</b> because attendance is locked upto {1}.",
+                [frm._max_repair_days, frm.doc.attendance_locked_upto]
+            ),
+            indicator: "orange"
+        });
+        frm.set_value("repair_window_days", frm._max_repair_days);
+    }
+}

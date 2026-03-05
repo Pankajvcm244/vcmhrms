@@ -148,17 +148,17 @@ override_doctype_class = {
 # }
 
 doc_events = {
-    # "Attendance": {
-    #     "validate": "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_strict_shift_timing",
-    # },
     "Employee Checkin": {
         "validate": "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_valid_window_in_out",
     },
     "Attendance": {
         "validate": [
-            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",  # if you keep it
+            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",  
             "vcmhrms.vcm_hrms.overrides.attendance_hooks.enforce_late_entry_policy",
         ]
+    },
+    "Payroll Entry": {
+        "on_submit": "vcmhrms.vcm_hrms.overrides.attendance_hooks.lock_attendance_after_payroll"
     }
     
 }

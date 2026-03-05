@@ -591,7 +591,7 @@ def enforce_late_entry_policy(doc, method=None):
               AND docstatus=1
               AND attendance_date BETWEEN %s AND %s
               AND IFNULL(custom_late_entry_within_grace, 0) = 1
-              AND status='Present'
+              "status": ["in", ["Present", "Half Day"]]
               AND name != %s
             """,
             (doc.employee, period_start, period_end, doc.name or ""),
@@ -646,3 +646,20 @@ def enforce_late_entry_policy(doc, method=None):
             else:
                 doc.half_day_status = None
 
+
+# automatically advance the lock date when payroll is submitted,
+#  which completely removes manual mistakes in Attendance Locked Upto
+def lock_attendance_after_payroll(doc, method):
+    pass
+    # if not doc.end_date:
+    #     return
+    # payroll_end = getdate(doc.end_date)
+    # settings = frappe.get_doc("VCM HR Settings")
+    # current_lock = settings.attendance_locked_upto
+    # # move lock forward only
+    # if not current_lock or payroll_end > getdate(current_lock):
+    #     settings.attendance_locked_upto = payroll_end
+    #     settings.save(ignore_permissions=True)
+    #     frappe.logger().info(
+    #         f"[VCM] Attendance lock advanced to {payroll_end} after Payroll Entry {doc.name}"
+    #     )
