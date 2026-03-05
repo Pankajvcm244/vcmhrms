@@ -29,7 +29,7 @@ def _get_holiday_dates_for_employee(employee: str, from_date, to_date) -> set:
     try:
         from hrms.hr.doctype.holiday_list.holiday_list import get_holidays_for_employee
         hol = get_holidays_for_employee(employee, from_date, to_date)
-
+        # logger.debug(f"Employee {employee}: fetched {len(hol or [])} holidays from HRMS utility")   
         # HRMS may return list[date] or list[dict]
         out = set()
         for x in hol or []:
@@ -56,6 +56,7 @@ def _get_holiday_dates_for_employee(employee: str, from_date, to_date) -> set:
         fields=["holiday_date"],
         limit_page_length=5000,
     )
+    # logger.debug(f"Employee {employee}: fetched {len(rows)} holidays from fallback Holiday List {holiday_list}")        
     return {getdate(r["holiday_date"]) for r in rows}
 
 
@@ -187,31 +188,27 @@ def _run_sandwich_for_employee(employee: str, from_date, to_date):
         block_end = d
         while add_days(block_end, 1) <= to_date and is_non_working(add_days(block_end, 1)):
             block_end = add_days(block_end, 1)
-
         p = prev_working(block_start)
         n = next_working(block_end)
-
         if not p or not n:
             d = add_days(block_end, 1)
             continue
-
         p_att = att_by_date.get(p)
         n_att = att_by_date.get(n)
-
         # Missing attendance on sides should count as Absent (do NOT skip).
         # But log for debug visibility.
         # if (employee == "HP1671") and (not p_att or not n_att):
         #     logger.debug(
         #         f"Employee {employee}: block {block_start}..{block_end} side attendance missing "
         #         f"(treated as Absent), p={p}({p_att.get('status') if p_att else 'None'}), "
-            #     f"n={n}({n_att.get('status') if n_att else 'None'})"
-            # )
+        #         f"n={n}({n_att.get('status') if n_att else 'None'})"
+        #     )
 
         # Leave-driven breaks sandwich
         if _is_leave_driven(p_att) or _is_leave_driven(n_att):
             cleared += _clear_sandwich_block(employee, block_start, block_end, att_by_date)
             # if (employee == "HP1671"):
-                # logger.debug(f"Employee {employee}: block {block_start}..{block_end} is broken by leave-driven attendance, p={p}({p_att.get('status')}), n={n}({n_att.get('status')})") 
+            #     logger.debug(f"Employee {employee}: block {block_start}..{block_end} is broken by leave-driven attendance, p={p}({p_att.get('status')}), n={n}({n_att.get('status')})") 
             d = add_days(block_end, 1)
             continue
 
