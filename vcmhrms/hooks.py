@@ -150,6 +150,7 @@ override_doctype_class = {
 doc_events = {
     "Employee Checkin": {
         "validate": "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_valid_window_in_out",
+        "after_insert": "vcmhrms.vcm_hrms.overrides.checkin_hooks.on_checkin_insert",
     },
     "Attendance": {
         "validate": [

@@ -56,7 +56,7 @@ def _get_holiday_dates_for_employee(employee: str, from_date, to_date) -> set:
         fields=["holiday_date"],
         limit_page_length=5000,
     )
-    # logger.debug(f"Employee {employee}: fetched {len(rows)} holidays from fallback Holiday List {holiday_list}")        
+    # logger.debug(f"[_get_holiday_dates_for_employee] Employee {employee}: fetched {len(rows)} holidays from fallback Holiday List {holiday_list}")        
     return {getdate(r["holiday_date"]) for r in rows}
 
 
@@ -107,7 +107,7 @@ def run_sandwich_policy(from_date=None, to_date=None, employee=None):
         return {"ok": True, "skipped": "range fully locked"}
     employees = [employee] if employee else frappe.get_all("Employee", filters={"status": "Active"}, pluck="name")
     totals = {"processed_employees": 0, "marked": 0, "cleared": 0, "range": [str(from_date), str(to_date)]}
-    # logger.debug(f"Running sandwich policy for {len(employees)} employees, from {from_date} to {to_date}, locked_upto={locked_upto}")
+    # logger.debug(f"[run_sandwich_policy 1] y for {len(employees)} employees, from {from_date} to {to_date}, locked_upto={locked_upto}")
     for emp in employees:
         totals["processed_employees"] += 1
         res = _run_sandwich_for_employee(emp, from_date, to_date)
@@ -148,8 +148,8 @@ def _run_sandwich_for_employee(employee: str, from_date, to_date):
         limit_page_length=5000,
     )
     att_by_date = {getdate(a["attendance_date"]): a for a in atts}
-    # if (employee == "HP1671"):
-    #     logger.debug(f"Employee {employee}: loaded {len(atts)} attendance records in scan range {scan_from}..{scan_to}")    
+    if (employee == "HP1671"):
+        logger.debug(f"[_run_sandwich_for_employee] Employee {employee}: loaded {len(atts)} attendance records in scan range {scan_from}..{scan_to}")    
 
     hol_dates = _get_holiday_dates_for_employee(employee, scan_from, scan_to)
     # if (employee == "HP1671"):
@@ -207,8 +207,8 @@ def _run_sandwich_for_employee(employee: str, from_date, to_date):
         # Leave-driven breaks sandwich
         if _is_leave_driven(p_att) or _is_leave_driven(n_att):
             cleared += _clear_sandwich_block(employee, block_start, block_end, att_by_date)
-            # if (employee == "HP1671"):
-            #     logger.debug(f"Employee {employee}: block {block_start}..{block_end} is broken by leave-driven attendance, p={p}({p_att.get('status')}), n={n}({n_att.get('status')})") 
+            if (employee == "HP1671"):
+                logger.debug(f"[_run_sandwich_for_employee] Employee {employee}: block {block_start}..{block_end} is broken by leave-driven attendance, p={p}({p_att.get('status')}), n={n}({n_att.get('status')})") 
             d = add_days(block_end, 1)
             continue
 
@@ -216,8 +216,8 @@ def _run_sandwich_for_employee(employee: str, from_date, to_date):
             x = block_start
             while x <= block_end:
                 marked += _apply_sandwich_day(employee, x, att_by_date)
-                # if (employee == "HP1671"):
-                #     logger.debug(f"Employee {employee}: marking {x} as Absent due to sandwich,") 
+                if (employee == "HP1671"):
+                    logger.debug(f"[_run_sandwich_for_employee] Employee {employee}: marking {x} as Absent due to sandwich,") 
                 x = add_days(x, 1)
         else:
             cleared += _clear_sandwich_block(employee, block_start, block_end, att_by_date)
