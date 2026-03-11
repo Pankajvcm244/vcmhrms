@@ -9,6 +9,9 @@
 // 2) click this button
 // 3) verify Attendance created/updated as expected
 // --------------------------------------------------------------
+let auto_attendance_running = false;
+let sandwich_running = false;
+
 frappe.ui.form.on("VCM HR Settings", {
 	refresh(frm) {
         frm.clear_custom_buttons();
@@ -24,11 +27,17 @@ frappe.ui.form.on("VCM HR Settings", {
             frm.set_df_property("attendance_locked_upto", "read_only", 1);
         }
         update_repair_days_limit(frm);
-
-        frm.add_custom_button(__("Run Auto Attendance Now"), () => {
+        
+        const btn_auto = frm.add_custom_button(__("Run Auto Attendance Now"), () => {
+            if (auto_attendance_running) {
+                frappe.msgprint(__("Auto Attendance is already running."));
+                return;
+            }
             frappe.confirm(
                 __("This will run HRMS auto-attendance for all enabled shifts. Continue?"),
                 async () => {
+                    auto_attendance_running = true;
+                    btn_auto.prop("disabled", true);
                     frappe.dom.freeze(__("Running auto-attendance…"));
                     try {
                         const r = await frappe.call({
@@ -37,7 +46,7 @@ frappe.ui.form.on("VCM HR Settings", {
                             // employee: "HP1671"
                             },
                         });
-                        console.log("Auto Attendance Response:", r);
+                        // console.log("Auto Attendance Response:", r);
                         if (!r.message || !r.message.ok) {
                             frappe.msgprint({
                                 title: __("Auto Attendance Failed"),
@@ -56,16 +65,35 @@ frappe.ui.form.on("VCM HR Settings", {
                         });
 
                         frm.reload_doc();
+                    } catch (e) {
+
+                        console.error(e);
+                        frappe.msgprint({
+                            title: __("Error"),
+                            message: __("Auto Attendance execution failed."),
+                            indicator: "red"
+                        });
                     } finally {
                         frappe.dom.unfreeze();
+                        auto_attendance_running = false;
+                        btn_auto.prop("disabled", false);
                     }
                 }
             );
         });
-        frm.add_custom_button(__("Run Sandwich Leave"), () => {
+        // -----------------------------
+        // SANDWICH LEAVE BUTTON
+        // -----------------------------
+        const btn_sandwich = frm.add_custom_button(__("Run Sandwich Leave"), () => {
+            if (sandwich_running) {
+                frappe.msgprint(__("Sandwich Leave process is already running."));
+                return;
+            }
             frappe.confirm(
                 __("This will run the Sandwich Leave policy. Continue?"),
                 async () => {
+                    sandwich_running = true;
+                    btn_sandwich.prop("disabled", true);
                     frappe.dom.freeze(__("Running Sandwich Leave…"));
                     try {
                         const r = await frappe.call({
@@ -74,7 +102,6 @@ frappe.ui.form.on("VCM HR Settings", {
                             // optional: employee: "HP1671"
                             },
                         });
-
                         if (!r.message || !r.message.ok) {
                             frappe.msgprint({
                                 title: __("Sandwich Leave Failed"),
@@ -92,8 +119,19 @@ frappe.ui.form.on("VCM HR Settings", {
                             indicator: "green"
                         });
                         frm.reload_doc();
+                    } catch (e) {
+
+                        console.error(e);
+
+                        frappe.msgprint({
+                            title: __("Error"),
+                            message: __("Sandwich Leave execution failed."),
+                            indicator: "red"
+                        });
                     } finally {
                         frappe.dom.unfreeze();
+                        sandwich_running = false;
+                        btn_sandwich.prop("disabled", false);
                     }
                 }
             );

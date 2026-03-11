@@ -156,11 +156,17 @@ doc_events = {
         "validate": [
             "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",  
             "vcmhrms.vcm_hrms.overrides.attendance_hooks.enforce_late_entry_policy",
-        ]
+        ],
+        # "on_submit": "vcmhrms.vcm_hrms.overrides.sandwich.evaluate_for_attendance",
+        # "on_cancel": "vcmhrms.vcm_hrms.overrides.sandwich.evaluate_for_attendance",
     },
     "Payroll Entry": {
         "on_submit": "vcmhrms.vcm_hrms.overrides.attendance_hooks.lock_attendance_after_payroll"
-    }
+    },
+    # "Leave Application": {
+    #     "on_submit": "vcmhrms.vcm_hrms.overrides.sandwich.evaluate_for_leave",
+    #     "on_cancel": "vcmhrms.vcm_hrms.overrides.sandwich.evaluate_for_leave",
+    # },
     
 }
 

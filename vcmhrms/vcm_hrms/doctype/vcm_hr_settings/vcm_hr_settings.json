@@ -24,12 +24,6 @@
    "label": "VCM HR Settings"
   },
   {
-   "default": "10",
-   "fieldname": "repair_window_days",
-   "fieldtype": "Int",
-   "label": "Repair Window Days"
-  },
-  {
    "fieldname": "column_break_ptio",
    "fieldtype": "Column Break"
   },
@@ -43,13 +37,18 @@
    "fieldname": "allowed_late_entry_count",
    "fieldtype": "Int",
    "label": "Allowed Late Entry Count"
+  },
+  {
+   "fieldname": "repair_window_days",
+   "fieldtype": "Int",
+   "label": "Repair Window Days"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-27 15:32:05.770673",
+ "modified": "2026-03-10 15:26:25.142716",
  "modified_by": "Administrator",
  "module": "VCM HRMS",
  "name": "VCM HR Settings",

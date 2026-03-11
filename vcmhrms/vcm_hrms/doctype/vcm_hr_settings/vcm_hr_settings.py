@@ -24,9 +24,14 @@ class VCMHRSettings(Document):
 	def on_update(self):
 		if not self.attendance_locked_upto:
 			return
+		# run only if lock date changed
+		if not self.has_value_changed("attendance_locked_upto"):
+			return
 		start = add_days(getdate(self.attendance_locked_upto), 1)
-		# logger.debug(f"Updating Shift Types to {start} ")	
+		logger.debug(f"Updating Shift Types to {start} ")	
 		frappe.db.sql("""
 			UPDATE `tabShift Type`
 			SET process_attendance_after = %s
-		""", (start))
+		""", (start,))
+		# clear cached Shift Types so HRMS scheduler reads new value
+		frappe.clear_cache(doctype="Shift Type")

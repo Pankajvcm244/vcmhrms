@@ -140,7 +140,7 @@ class VCMShiftType(HRMSShiftType):
     """ 
  
     def process_auto_attendance(self, is_manually_triggered=False):
-        # logger.debug("in process_auto_attendance (forcing safe non-manual mode)")
+        logger.debug("in process_auto_attendance (forcing safe non-manual mode)")
         # Then do targeted repair for late-arriving punches,  
         # Unlink/cancel impacted days first, so HRMS can recreate them cleanly on next run.
         self.reconcile_late_checkins()
@@ -186,7 +186,7 @@ class VCMShiftType(HRMSShiftType):
             # logger.debug(f" Adjusted repair_floor based on lock: {repair_floor}")
         # First run safety: only look at last 1 day to to handle Null Last_run
         from_dt = get_datetime(last_run) if last_run else add_days(now_datetime(), -1)
-        # logger.debug(f" reconcile_late_checkins  Fetching checkins {from_dt} (repair floor {repair_floor}) for shift {self.name}") 
+        logger.debug(f" reconcile_late_checkins  Fetching checkins {from_dt} (repair floor {repair_floor}) for shift {self.name}") 
         # Prevent parallel repair runs        
         try:
             checkins = frappe.get_all(
@@ -202,7 +202,7 @@ class VCMShiftType(HRMSShiftType):
                 order_by="employee, time asc",
                 limit_page_length=5000,
             )
-            # logger.debug(f" reconcile_late_checkins  Found {(checkins)} checkins to reconcile for shift {self.name}")    
+            logger.debug(f" reconcile_late_checkins  Found {(checkins)} checkins to reconcile for shift {self.name}")    
             if not checkins:
                 return
             buckets = set()
@@ -553,6 +553,12 @@ def run_auto_attendance_now(employee: str | None = None):
     # if "System Manager" not in roles and "HR Manager" not in roles:
     #     frappe.throw(("Not permitted."))
     details = {"started_at": str(now_datetime())}
+    # import traceback
+
+    # logger.debug(
+    #     "run_auto_attendance_now called\n%s",
+    #     "".join(traceback.format_stack())
+    # )
     # logger.debug(f"Manual trigger for auto attendance by user {frappe.session.user} for employee {employee}")
     logging.debug(f"[run_auto_attendance_now] Manual trigger details: {details}")
     processed = 0

@@ -1,22 +1,77 @@
 import frappe
-from frappe.utils import getdate, nowdate, add_days, cint
+from frappe.utils import getdate, nowdate, add_days, get_datetime
 import logging
 logger = logging.getLogger(__name__)
+SANDWICH_LEAVE_TYPE = "Sandwich Absent"
 
+# ------------------------------------------------------------
+# Night scheduler entry
+# ------------------------------------------------------------
 @frappe.whitelist()
 def run_sandwich_daily():
     settings = frappe.get_cached_doc("VCM HR Settings")
     locked_upto = getdate(settings.attendance_locked_upto) if settings.attendance_locked_upto else None
-    # Decide window: run for “open period” only
-    start = add_days(locked_upto, 1) if locked_upto else add_days(getdate(nowdate()), -31)
-    end = getdate(nowdate())
-    run_sandwich_policy(from_date=start, to_date=end)
+    today = getdate(nowdate())
+    if locked_upto:
+        start = add_days(locked_upto, 1)
+    if locked_upto and start <= locked_upto:
+        start = add_days(locked_upto, 1)
+    if start > today:
+        return {"ok": True, "skipped": "range fully locked"}
+    return run_sandwich_policy(start, today)
+
+
+# ------------------------------------------------------------
+# Main  runner where we do everything in one go for an employee 
+# ------------------------------------------------------------
+@frappe.whitelist()
+def run_sandwich_policy(from_date=None, to_date=None, employee=None):
+    """
+    Optimized Sandwich Rule
+    If employee is Absent on both sides of a Holiday/WeeklyOff block,
+    then those Holiday/WeeklyOff dates become Absent.
+    Improvements:
+    - Only process employees with activity
+    - Skip employees without holidays
+    - Minimal attendance queries
+    """
+    to_date = getdate(to_date or nowdate())
+    from_date = getdate(from_date)
+    # Respect attendance lock: never touch locked or earlier
+    settings = frappe.get_cached_doc("VCM HR Settings")
+    locked_upto = getdate(settings.attendance_locked_upto) if getattr(settings, "attendance_locked_upto", None) else None
+    if locked_upto and from_date <= locked_upto:
+        from_date = add_days(locked_upto, 1)
+    if locked_upto and to_date <= locked_upto:
+        return {"ok": True, "skipped": "range fully locked"}
+    employees = [employee] if employee else frappe.get_all(
+        "Employee",
+        filters={"status": "Active"},
+        pluck="name"
+    )
+    created = 0
+    cleared = 0
+    # logger.debug(f"[run_sandwich_policy 1] y for {len(employees)} employees, from {from_date} to {to_date}, locked_upto={locked_upto}")
+    for emp in employees:
+        # Skip if employee has no holiday in this range
+        hol_dates = _get_holiday_dates_for_employee(emp, from_date, to_date)
+        if not hol_dates:
+            continue
+        res = _run_sandwich_for_employee(emp, from_date, to_date, hol_dates)
+        created += res["created"]
+        cleared += res["cleared"]    
+    frappe.db.commit()
+    return {
+        "created": created,
+        "cleared": cleared
+    }
+
 
 
 # ------------------------------------------------------------
 # Helpers: Holiday/WeeklyOff dates for employee
 # ------------------------------------------------------------
-def _get_holiday_dates_for_employee(employee: str, from_date, to_date) -> set:
+def _get_holiday_dates_for_employee(employee, from_date, to_date):
     """
     Returns set(date) for all holiday + weekly-off dates.
     Best case: HRMS helper exists.
@@ -31,13 +86,7 @@ def _get_holiday_dates_for_employee(employee: str, from_date, to_date) -> set:
         hol = get_holidays_for_employee(employee, from_date, to_date)
         # logger.debug(f"Employee {employee}: fetched {len(hol or [])} holidays from HRMS utility")   
         # HRMS may return list[date] or list[dict]
-        out = set()
-        for x in hol or []:
-            if isinstance(x, dict):
-                out.add(getdate(x.get("holiday_date")))
-            else:
-                out.add(getdate(x))
-        return out
+        return {getdate(x["holiday_date"]) if isinstance(x, dict) else getdate(x) for x in hol}
     except Exception:
         pass
 
@@ -53,291 +102,166 @@ def _get_holiday_dates_for_employee(employee: str, from_date, to_date) -> set:
             "parent": holiday_list,
             "holiday_date": ("between", [from_date, to_date]),
         },
-        fields=["holiday_date"],
+        pluck="holiday_date",
         limit_page_length=5000,
     )
     # logger.debug(f"[_get_holiday_dates_for_employee] Employee {employee}: fetched {len(rows)} holidays from fallback Holiday List {holiday_list}")        
-    return {getdate(r["holiday_date"]) for r in rows}
-
-
-def _is_absent(att: dict | None) -> bool:
-    """
-    Sandwich counts ONLY strict Absent.
-    IMPORTANT: Missing Attendance record counts as Absent (your requirement),
-    so None => True.
-    """
-    if not att:
-        return True
-    return (att.get("status") or "").strip().lower() == "absent"
-
-
-def _is_leave_driven(att: dict | None) -> bool:
-    """
-    Missing Attendance cannot be considered leave-driven.
-    """
-    if not att:
-        return False
-    status = (att.get("status") or "").strip().lower()
-    return bool(att.get("leave_application") or att.get("leave_type") or status == "on leave")
-
+    return {getdate(r) for r in rows}
 
 # ------------------------------------------------------------
-# Public runner
+# Attendance helpers
 # ------------------------------------------------------------
-@frappe.whitelist()
-def run_sandwich_policy(from_date=None, to_date=None, employee=None):
-    """
-    Sandwich rule (always enabled):
-    If employee is Absent on both sides of a Holiday/WeeklyOff block,
-    then those Holiday/WeeklyOff dates become Absent (LWP) and we set:
-        Attendance.custom_sandwich_applied = 1
-
-    Auto-clear:
-    If later punches/leave change the side days, re-running will clear sandwich flags
-    and (optionally) cancel sandwich-created attendance docs.
-    """
-    to_date = getdate(to_date or nowdate())
-    from_date = getdate(from_date or add_days(to_date, -31))
-    # Respect attendance lock: never touch locked or earlier
-    settings = frappe.get_cached_doc("VCM HR Settings")
-    locked_upto = getdate(settings.attendance_locked_upto) if getattr(settings, "attendance_locked_upto", None) else None
-    if locked_upto and from_date <= locked_upto:
-        from_date = add_days(locked_upto, 1)
-    if locked_upto and to_date <= locked_upto:
-        return {"ok": True, "skipped": "range fully locked"}
-    employees = [employee] if employee else frappe.get_all("Employee", filters={"status": "Active"}, pluck="name")
-    totals = {"processed_employees": 0, "marked": 0, "cleared": 0, "range": [str(from_date), str(to_date)]}
-    # logger.debug(f"[run_sandwich_policy 1] y for {len(employees)} employees, from {from_date} to {to_date}, locked_upto={locked_upto}")
-    for emp in employees:
-        totals["processed_employees"] += 1
-        res = _run_sandwich_for_employee(emp, from_date, to_date)
-        totals["marked"] += res["marked"]
-        totals["cleared"] += res["cleared"]
-    frappe.db.commit()
-    return {"ok": True, **totals}
-
-
-# ------------------------------------------------------------
-# Core per-employee logic
-# ------------------------------------------------------------
-def _run_sandwich_for_employee(employee: str, from_date, to_date):
-    # Need neighbor lookup, so scan with a buffer, considering 
-    """
-    p=None, n=Absent ⇒ treated as Absent/Absent ⇒ sandwich applies
-    p=Absent, n=None ⇒ sandwich applies
-    p=None, n=On Leave ⇒ leave-driven breaks ⇒ no sandwich
-    p=Half Day, n=Absent ⇒ Half Day is not absent ⇒ no sandwich
-    p=Absent, n=Present ⇒ no sandwich
-    """
-    buffer_days = 5
-    scan_from = add_days(from_date, -buffer_days)
-    scan_to = add_days(to_date, buffer_days)
-
-    # Attendance map in scan range
-    atts = frappe.get_all(
+def _get_attendance_status(employee, date):
+    status = frappe.db.get_value(
         "Attendance",
-        filters={
+        {
             "employee": employee,
-            "attendance_date": ("between", [scan_from, scan_to]),
+            "attendance_date": date,
             "docstatus": ("<", 2),
         },
-        fields=[
-            "name", "attendance_date", "status", "docstatus",
-            "leave_application", "leave_type", "custom_sandwich_applied",
-        ],
-        limit_page_length=5000,
+        "status",
     )
-    att_by_date = {getdate(a["attendance_date"]): a for a in atts}
-    if (employee == "HP1671"):
-        logger.debug(f"[_run_sandwich_for_employee] Employee {employee}: loaded {len(atts)} attendance records in scan range {scan_from}..{scan_to}")    
+    if not status:
+        return "Absent"
+    return status
 
-    hol_dates = _get_holiday_dates_for_employee(employee, scan_from, scan_to)
-    # if (employee == "HP1671"):
-    #     logger.debug(f"Employee {employee}: found {len(hol_dates)} holiday/weekly-off ")
-
-    def is_non_working(d):
-        return d in hol_dates
-
-    def prev_working(d):
-        x = add_days(d, -1)
-        while x >= scan_from and is_non_working(x):
-            x = add_days(x, -1)
-        return x if x >= scan_from else None
-
-    def next_working(d):
-        x = add_days(d, 1)
-        while x <= scan_to and is_non_working(x):
-            x = add_days(x, 1)
-        return x if x <= scan_to else None
-
-    # Helper to resolve day status (treat missing as Absent)
-    def _resolve_status(status_by_date, d):
-        # Default: Absent if no Attendance record exists
-        return (status_by_date.get(d) or "Absent")
-
-    marked = cleared = 0
+# ------------------------------------------------------------
+# Core sandwich logic
+# ------------------------------------------------------------
+def _run_sandwich_for_employee(employee, from_date, to_date, hol_dates):
+    logging.debug(f"_run_sandwich_for_employee {employee} from {from_date} to {to_date} with holidays on {hol_dates}")   
+    created = 0
+    cleared = 0
     d = from_date
-
     while d <= to_date:
-        if not is_non_working(d):
+        if d not in hol_dates:
             d = add_days(d, 1)
             continue
-
-        # Find contiguous non-working block
         block_start = d
         block_end = d
-        while add_days(block_end, 1) <= to_date and is_non_working(add_days(block_end, 1)):
+        while add_days(block_end, 1) in hol_dates:
             block_end = add_days(block_end, 1)
-        p = prev_working(block_start)
-        n = next_working(block_end)
-        if not p or not n:
+        prev_day = _prev_working_day(block_start, hol_dates)
+        next_day = _next_working_day(block_end, hol_dates)
+        if not prev_day or not next_day:
             d = add_days(block_end, 1)
             continue
-        p_att = att_by_date.get(p)
-        n_att = att_by_date.get(n)
-        # Missing attendance on sides should count as Absent (do NOT skip).
-        # But log for debug visibility.
-        # if (employee == "HP1671") and (not p_att or not n_att):
-        #     logger.debug(
-        #         f"Employee {employee}: block {block_start}..{block_end} side attendance missing "
-        #         f"(treated as Absent), p={p}({p_att.get('status') if p_att else 'None'}), "
-        #         f"n={n}({n_att.get('status') if n_att else 'None'})"
-        #     )
-
-        # Leave-driven breaks sandwich
-        if _is_leave_driven(p_att) or _is_leave_driven(n_att):
-            cleared += _clear_sandwich_block(employee, block_start, block_end, att_by_date)
-            if (employee == "HP1671"):
-                logger.debug(f"[_run_sandwich_for_employee] Employee {employee}: block {block_start}..{block_end} is broken by leave-driven attendance, p={p}({p_att.get('status')}), n={n}({n_att.get('status')})") 
-            d = add_days(block_end, 1)
-            continue
-
-        if _is_absent(p_att) and _is_absent(n_att):
+        prev_status = _get_attendance_status(employee, prev_day)
+        next_status = _get_attendance_status(employee, next_day)
+        if prev_status == "Absent" and next_status == "Absent":
             x = block_start
             while x <= block_end:
-                marked += _apply_sandwich_day(employee, x, att_by_date)
-                if (employee == "HP1671"):
-                    logger.debug(f"[_run_sandwich_for_employee] Employee {employee}: marking {x} as Absent due to sandwich,") 
+                created += _apply_sandwich_day(employee, x)
                 x = add_days(x, 1)
         else:
-            cleared += _clear_sandwich_block(employee, block_start, block_end, att_by_date)
-
+            cleared += _clear_sandwich_block(employee, block_start, block_end)
         d = add_days(block_end, 1)
-        # if (employee == "HP1671"):
-        #     logger.debug(
-        #         f"Employee {employee}: processed block {block_start}..{block_end}, "
-        #         # f"prev={p}({p_att.get('status') if p_att else 'None'}), "
-        #         # f"next={n}({n_att.get('status') if n_att else 'None'}), "
-        #         f"marked={marked}, cleared={cleared}"
-        #     )
-    return {"marked": marked, "cleared": cleared}
-
-
+    return {"created": created, "cleared": cleared}
+           
 # ------------------------------------------------------------
-# Apply / Clear actions
+# Working day helpers
 # ------------------------------------------------------------
-def _apply_sandwich_day(employee: str, d, att_by_date: dict) -> int:
-    """
-    If Attendance exists for that non-working day, mark it Absent + sandwich flag.
-    If not, create submitted Attendance as Absent with sandwich flag.
-    """
-    a = att_by_date.get(d)
+def _prev_working_day(date, holidays):
+    d = add_days(date, -1)
+    while d in holidays:
+        d = add_days(d, -1)
+    return d
 
-    if a and cint(a.get("custom_sandwich_applied") or 0) == 1 and (a.get("status") or "") == "Absent":
+def _next_working_day(date, holidays):
+    d = add_days(date, 1)
+    while d in holidays:
+        d = add_days(d, 1)
+    return d
+# ------------------------------------------------------------
+# Apply sandwich leave
+# ------------------------------------------------------------
+def _apply_sandwich_day(employee, date):
+    settings = frappe.get_cached_doc("VCM HR Settings")
+    locked_upto = getdate(settings.attendance_locked_upto) if settings.attendance_locked_upto else None
+    if locked_upto and date <= locked_upto:
         return 0
-
-    if a:
-        # Never override leave-driven attendance
-        if _is_leave_driven(a):
-            return 0
-
-        doc = frappe.get_doc("Attendance", a["name"])
-
-        # Only touch if it's not already Absent sandwich
-        changed = False
-        if (doc.status or "") != "Absent":
-            doc.status = "Absent"
-            changed = True
-        if cint(getattr(doc, "custom_sandwich_applied", 0) or 0) != 1:
-            doc.custom_sandwich_applied = 1
-            changed = True
-
-        if changed:
-            doc.save(ignore_permissions=True)
-            if doc.docstatus == 0:
-                doc.submit()
-
-        att_by_date[d] = frappe.get_value(
-            "Attendance", doc.name,
-            ["name","attendance_date","status","docstatus","leave_application","leave_type","custom_sandwich_applied"],
-            as_dict=True
-        )
-        return 1
-
-    # Create new Attendance for that holiday/off day
-    doc = frappe.get_doc({
-        "doctype": "Attendance",
-        "employee": employee,
-        "attendance_date": d,
-        "status": "Absent",
-        "custom_sandwich_applied": 1,
-        "custom_created_by_sandwich": 1,
-    })
-    doc.insert(ignore_permissions=True)
-    doc.submit()
-
-    att_by_date[d] = frappe.get_value(
-        "Attendance", doc.name,
-        ["name","attendance_date","status","docstatus","leave_application","leave_type","custom_sandwich_applied"],
-        as_dict=True
+    #  avoid future dates
+    today = getdate(nowdate())
+    if date > today:
+        return 0
+    #  in case of Overtime we may have checkin but no attendance, so we should skip sandwich in that case
+    start_dt = get_datetime(date)
+    end_dt = get_datetime(add_days(date, 1))
+    checkin = frappe.db.exists(
+        "Employee Checkin",
+        {
+            "employee": employee,
+            "time": ("between", [start_dt, end_dt])
+        }
     )
+    if checkin:
+        return 0
+    # Skip if employee worked that day
+    att = frappe.db.exists(
+        "Attendance",
+        {
+            "employee": employee,
+            "attendance_date": date,
+            "docstatus": ("<", 2),
+        },
+    )
+    if att:
+        logger.debug(f"Skipping sandwich for {employee} on {date} since attendance {att} exists")
+        return 0
+    # Skip if leave already exists
+    existing = frappe.db.exists(
+        "Leave Application",
+        {
+            "employee": employee,
+            "from_date": ("<=", date),
+            "to_date": (">=", date),
+            "docstatus": 1
+        }
+    )
+    if existing:
+        logger.debug(f"Skipping sandwich for {employee} on {date} since leave already exists")  
+        return 0
+    leave = frappe.get_doc(
+        {
+            "doctype": "Leave Application",
+            "employee": employee,
+            "leave_type": SANDWICH_LEAVE_TYPE,
+            "from_date": date,
+            "to_date": date,
+            "status": "Approved",
+            "description": "Auto Sandwich Leave",
+        }
+    )
+    leave.insert(ignore_permissions=True)
+    leave.submit()
+    logger.debug(f"Sandwich leave created for {employee} on {date}")
     return 1
 
 
-def _clear_sandwich_block(employee: str, start, end, att_by_date: dict) -> int:
-    """
-    Clear sandwich-applied flag for non-working days in [start..end].
-    Optionally cancel Attendance docs that were created only due to sandwich. "custom_created_by_sandwich": 1,
-    (I’m keeping it SAFE: just clear the flag + leave status unchanged, unless you want cancel.)
-    """
+# ------------------------------------------------------------
+# Clear sandwich leave
+# ------------------------------------------------------------
+def _clear_sandwich_block(employee, start, end):
+
+    leaves = frappe.get_all(
+        "Leave Application",
+        filters={
+            "employee": employee,
+            "leave_type": SANDWICH_LEAVE_TYPE,
+            "from_date": ("<=", end),
+            "to_date": (">=", start),
+            "docstatus": 1,
+        },
+        pluck="name",
+    )
     cleared = 0
-    x = start
-    while x <= end:
-        a = att_by_date.get(x)
-        if a and cint(a.get("custom_sandwich_applied") or 0) == 1:
-            doc = frappe.get_doc("Attendance", a["name"])
-            created_by_sandwich = cint(getattr(doc, "custom_created_by_sandwich", 0) or 0)
-            if created_by_sandwich and doc.docstatus == 1:
-                # Safe revert: cancel the doc we created
-                doc.cancel()
-                att_by_date.pop(x, None)
-            else:
-                # Just clear the flag on existing records
-                doc.custom_sandwich_applied = 0
-                doc.save(ignore_permissions=True)
-                att_by_date[x]["custom_sandwich_applied"] = 0
-            cleared += 1
-        x = add_days(x, 1)
+    for name in leaves:
+        doc = frappe.get_doc("Leave Application", name)
+        doc.cancel()
+        logger.info(f"Sandwich leave cancelled for {employee} ({doc.from_date})")
+        cleared += 1
     return cleared
 
 
-# build a full calendar once per employee, to avoid repeated db hits in the core loop.
-def _build_status_calendar(scan_start, scan_end, attendance_rows, doj=None, relieve=None):
-    # default Absent for every day
-    status_by_date = {}
-    d = scan_start
-    while d <= scan_end:
-        # optionally ignore outside employment window
-        if doj and d < doj:
-            status_by_date[d] = None   # "ignore"
-        elif relieve and d > relieve:
-            status_by_date[d] = None   # "ignore"
-        else:
-            status_by_date[d] = "Absent"
-        d = add_days(d, 1)
-    # overlay actual attendances
-    for r in attendance_rows:
-        ad = r.attendance_date
-        if ad in status_by_date and status_by_date[ad] is not None:
-            status_by_date[ad] = r.status  # Present / Half Day / Absent / On Leave
-    return status_by_date
+
+
