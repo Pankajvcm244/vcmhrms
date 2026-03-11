@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta, time as pytime
 from hrms.hr.doctype.shift_type.shift_type import ShiftType as HRMSShiftType
 logger = logging.getLogger(__name__)
+SANDWICH_LEAVE_TYPE = "Sandwich Absent"
 
 # Auto-attendance will only ever consider checkins from the current 
 # payroll period (26th onward) (plus any HRMS “process_attendance_after” constraint).
@@ -176,7 +177,11 @@ class VCMShiftType(HRMSShiftType):
             shift = frappe.get_doc("Shift Type", "GENERAL9_30_to_6_00")
             shift.process_auto_attendance()
         """
-        # logger.debug(f" in reconcile_late_checkins ")
+        
+        # -------------------------------------------------------
+        # Capture repair start time (important for incremental safety)
+        # -------------------------------------------------------
+        repair_start = now_datetime()
         locked_upto, repair_days, last_run = get_company_lock_and_windows()
         # logger.debug(f" locked_upto {locked_upto}, repair_days {repair_days}, last_run {last_run} ")
         today = getdate(nowdate())
@@ -184,11 +189,15 @@ class VCMShiftType(HRMSShiftType):
         if locked_upto:
             repair_floor = max(repair_floor, add_days(locked_upto, 1))
             # logger.debug(f" Adjusted repair_floor based on lock: {repair_floor}")
-        # First run safety: only look at last 1 day to to handle Null Last_run
-        from_dt = get_datetime(last_run) if last_run else add_days(now_datetime(), -1)
-        logger.debug(f" reconcile_late_checkins  Fetching checkins {from_dt} (repair floor {repair_floor}) for shift {self.name}") 
+         # incremental window
+        from_dt = get_datetime(last_run) if last_run else add_days(repair_start, -1)
+        # if self.name == "GENERAL9_30_to_6_00":
+        #     logger.debug(f"reconcile_late_checkins checkins {from_dt} (repair {repair_floor}) shift {self.name}") 
         # Prevent parallel repair runs        
         try:
+            # -------------------------------------------------------
+            # Fetch late or modified checkins
+            # -------------------------------------------------------
             checkins = frappe.get_all(
                 "Employee Checkin",
                 filters={
@@ -202,9 +211,13 @@ class VCMShiftType(HRMSShiftType):
                 order_by="employee, time asc",
                 limit_page_length=5000,
             )
-            logger.debug(f" reconcile_late_checkins  Found {(checkins)} checkins to reconcile for shift {self.name}")    
+            if self.name == "GENERAL9_30_to_6_00":
+                logger.debug(f" reconcile_late_checkins  Found {(checkins)} checkins to reconcile for shift {self.name}")    
             if not checkins:
                 return
+            # -------------------------------------------------------
+            # Build impacted employee-day buckets
+            # -------------------------------------------------------
             buckets = set()
             for c in checkins:
                 punch_dt = get_datetime(c.time)
@@ -222,7 +235,9 @@ class VCMShiftType(HRMSShiftType):
                 buckets.add((c.employee, adate))
             if not buckets:
                 return
-
+            # -------------------------------------------------------
+            # Build impacted employee-day buckets
+            # -------------------------------------------------------
             for employee, adate in sorted(buckets):
                 attendance = frappe.get_value(
                     "Attendance",
@@ -238,31 +253,63 @@ class VCMShiftType(HRMSShiftType):
                     ],
                     as_dict=True,
                 )
+                # ---------------------------------------------------
+                # If attendance missing → unlink logs so HRMS rebuilds
+                # ---------------------------------------------------
                 if not attendance:
                     _unlink_day_checkins(employee, adate)
+                    if self.name == "GENERAL9_30_to_6_00":
+                        logger.debug(f" reconcile_late_checkins  No attendance found for employee {employee} on date {adate}, but found punches, unlinking checkins for HRMS to recreate attendance cleanly")
                     continue
-                status_lc = (attendance.status or "").strip().lower()
-                half_day_status_lc = (attendance.half_day_status or "").strip().lower()
-                is_leave_driven = bool(
-                    attendance.leave_application
-                    or attendance.leave_type
-                    or status_lc == "on leave"
-                    or (status_lc == "half day" and half_day_status_lc in ("on leave", "leave"))
-                )
-                if is_leave_driven:
-                    _sync_leave_attendance_times(attendance, employee, adate)
-                    continue
+                # ---------------------------------------------------
+                # Cancel Sandwich Leave Application if present
+                # ---------------------------------------------------
+                if attendance.leave_type == SANDWICH_LEAVE_TYPE and attendance.leave_application:
+                    try:
+                        leave_doc = frappe.get_doc(
+                            "Leave Application",
+                            attendance.leave_application
+                        )
+                        if leave_doc.docstatus == 1:
+                            leave_doc.cancel()
+                            logger.debug(
+                                f"repair: cancelled sandwich leave {leave_doc.name} "
+                                f"employee={employee} date={adate}"
+                            )
+                    except Exception:
+                        logger.exception(
+                            f"repair: failed cancelling sandwich leave "
+                            f"employee={employee} date={adate}"
+                        )
+                # ---------------------------------------------------
+                # Cancel existing attendance
+                # ---------------------------------------------------
                 if attendance.docstatus == 1:
                     frappe.get_doc("Attendance", attendance.name).cancel()
+                    logger.debug(
+                        f"repair: cancelled attendance {attendance.name} "
+                        f"employee={employee} date={adate}"
+                    )
+                # ---------------------------------------------------
+                # Unlink checkins so HRMS recomputes
+                # ---------------------------------------------------
                 _unlink_day_checkins(employee, adate)
+                # ---------------------------------------------------
+                # Trigger HRMS auto-attendance rebuild
+                # ---------------------------------------------------
+                shift_doc = frappe.get_cached_doc("Shift Type", attendance.shift)
+                shift_doc.process_auto_attendance()
         finally:
+            # -------------------------------------------------------
+            # Update repair timestamp safely
+            # -------------------------------------------------------
             frappe.db.set_value(
                 "VCM HR Settings",
                 "VCM HR Settings",
                 "last_repair_run_at",
-                now_datetime(),
+                repair_start,
             )
-            frappe.db.commit()         
+            frappe.db.commit()      
 
     
     # Override has_incorrect_shift_config() to allow running
