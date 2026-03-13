@@ -12,6 +12,7 @@ def run_sandwich_daily():
     settings = frappe.get_cached_doc("VCM HR Settings")
     locked_upto = getdate(settings.attendance_locked_upto) if settings.attendance_locked_upto else None
     today = getdate(nowdate())
+    start = add_days(today, -5)   # safe default window if locked_upto is blank
     if locked_upto:
         start = add_days(locked_upto, 1)
     if locked_upto and start <= locked_upto:
@@ -198,7 +199,7 @@ def _apply_sandwich_day(employee, date):
         ],
         as_dict=True
     )
-    logger.debug(f"_apply_sandwich_day: Attendance for {employee} on {date}: {att}")
+    # logger.debug(f"_apply_sandwich_day: Attendance for {employee} on {date}: {att}")
     if att:
         first_half = int(att.get("custom_first_half_done") or 0)
         second_half = int(att.get("custom_second_half_done") or 0)

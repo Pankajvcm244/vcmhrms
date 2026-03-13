@@ -141,7 +141,7 @@ class VCMShiftType(HRMSShiftType):
     """ 
  
     def process_auto_attendance(self, is_manually_triggered=False):
-        logger.debug("in process_auto_attendance (forcing safe non-manual mode)")
+        # logger.debug("in process_auto_attendance (forcing safe non-manual mode)")
         # Then do targeted repair for late-arriving punches,  
         # Unlink/cancel impacted days first, so HRMS can recreate them cleanly on next run.
         self.reconcile_late_checkins()
@@ -159,11 +159,18 @@ class VCMShiftType(HRMSShiftType):
         - overtime on holiday/weekoff
         - device sync delay
         - manual checkin edits
+        collect shifts
+        finish employee loop
+        rebuild shifts once
         """
-        
+        #  recurrsion lock  
+        if getattr(frappe.flags, "vcm_repair_running", False):
+            return
+        frappe.flags.vcm_repair_running = True      
         # -------------------------------------------------------
         # Capture repair start time (important for incremental safety)
         # -------------------------------------------------------
+        
         repair_start = now_datetime()
         locked_upto, repair_days, last_run = get_company_lock_and_windows()
         # logger.debug(f" locked_upto {locked_upto}, repair_days {repair_days}, last_run {last_run} ")
@@ -252,7 +259,7 @@ class VCMShiftType(HRMSShiftType):
                         "Employee Checkin",
                         {
                             "employee": employee,
-                            "time": ["between", [adate, add_days(adate, 1)]],
+                            "time": ("between", [adate, add_days(adate, 1)]),
                             "offshift": 0
                         },
                         "shift"
@@ -277,15 +284,15 @@ class VCMShiftType(HRMSShiftType):
                                     f"employee={employee} date={adate}"
                                 )
                         except Exception:
-                            logger.exception(
-                                f"repair: failed cancelling sandwich leave "
-                                f"employee={employee} date={adate}"
-                            )
+                            logger.exception("sandwich cancel failed")
                 # ---------------------------------------------------
                 # Cancel existing attendance
                 # ---------------------------------------------------
                 if attendance.docstatus == 1:
-                    frappe.get_doc("Attendance", attendance.name).cancel()
+                    att_doc = frappe.get_doc("Attendance", attendance.name)
+                    if att_doc.docstatus == 1:
+                        att_doc.cancel()
+
                     logger.debug(
                         f"repair: cancelled attendance {attendance.name} "
                         f"employee={employee} date={adate}"
@@ -296,15 +303,15 @@ class VCMShiftType(HRMSShiftType):
                 _unlink_day_checkins(employee, adate)
                 if attendance.shift:
                     shifts_to_rebuild.add(attendance.shift)
-               # -----------------------------------------------------
-                # Rebuild attendance once per shift
-                # -----------------------------------------------------
-                for shift_name in shifts_to_rebuild:
-                    logger.debug(
-                        f"[repair] rebuilding attendance for shift {shift_name}"
-                    )
-                    shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
-                    shift_doc.process_auto_attendance()
+            # -----------------------------------------------------
+            # Rebuild attendance once per shift
+            # -----------------------------------------------------
+            for shift_name in shifts_to_rebuild:
+                logger.debug(
+                    f"[repair] rebuilding attendance for shift {shift_name}"
+                )
+                shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
+                shift_doc.process_auto_attendance()
         finally:
             # -------------------------------------------------------
             # Update repair timestamp safely
@@ -315,7 +322,9 @@ class VCMShiftType(HRMSShiftType):
                 "last_repair_run_at",
                 repair_start,
             )
-            frappe.db.commit()      
+            frappe.db.commit()
+            #  release lock
+            frappe.flags.vcm_repair_running = False      
 
     
     # Override has_incorrect_shift_config() to allow running
