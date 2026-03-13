@@ -163,10 +163,9 @@ doc_events = {
     "Payroll Entry": {
         "on_submit": "vcmhrms.vcm_hrms.overrides.attendance_hooks.lock_attendance_after_payroll"
     },
-    # "Leave Application": {
-    #     "on_submit": "vcmhrms.vcm_hrms.overrides.sandwich.evaluate_for_leave",
-    #     "on_cancel": "vcmhrms.vcm_hrms.overrides.sandwich.evaluate_for_leave",
-    # },
+    "Leave Application": {
+        "before_submit": "vcmhrms.vcm_hrms.overrides.leavefix.fix_existing_attendance"
+    },
     
 }
 
