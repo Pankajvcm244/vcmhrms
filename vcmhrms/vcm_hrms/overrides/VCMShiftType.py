@@ -661,9 +661,9 @@ def run_auto_attendance_now(employee: str | None = None):
     )
     details.update({"mode": "all_shifts"})
     return {
-        "ok": True,
+        "ok": errors == 0,
         "processed": processed,
-        "errors": 0,
+        "errors": errors,
         "details": details,
     }
 

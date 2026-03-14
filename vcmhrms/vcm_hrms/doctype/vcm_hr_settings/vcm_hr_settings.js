@@ -113,8 +113,12 @@ frappe.ui.form.on("VCM HR Settings", {
                         frappe.msgprint({
                             title: __("Sandwich Leave Completed"),
                             message: __(
-                                "Processed: {0} sandwich leaves",
-                                [r.message.processed || 0]
+                                "Processed: {0} | Created: {1} | Cleared: {2}",
+                                [
+                                    r.message.processed || 0,
+                                    r.message.created || 0,
+                                    r.message.cleared || 0
+                                ]
                             ),
                             indicator: "green"
                         });

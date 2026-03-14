@@ -18,7 +18,13 @@ def run_sandwich_daily():
     if locked_upto and start <= locked_upto:
         start = add_days(locked_upto, 1)
     if start > today:
-        return {"ok": True, "skipped": "range fully locked"}
+        return {
+            "ok": True,
+            "processed": 0,
+            "created": 0,
+            "cleared": 0,
+            "skipped": "range fully locked"
+        }
     return run_sandwich_policy(start, today)
 
 
@@ -63,6 +69,8 @@ def run_sandwich_policy(from_date=None, to_date=None, employee=None):
         cleared += res["cleared"]    
     frappe.db.commit()
     return {
+        "ok": True,
+        "processed": created + cleared,
         "created": created,
         "cleared": cleared
     }
@@ -128,27 +136,56 @@ def _get_attendance_status(employee, date):
 
 # ------------------------------------------------------------
 # Core sandwich logic
+# A holiday / weekly off becomes sandwich only when it is between two absences.
+    # Fri   Absent
+    # Sat   Weekly Off
+    # Sun   Weekly Off
+    # Mon   Absent
+    # Result:
+        # Sat  Sandwich
+        # Sun  Sandwich
+    # Leave or Present breaks sandwich
+    # Thu   Absent
+    # Fri   Holiday
+    # Sat   Weekly Off
+    # Sun   Weekly Off
+    # Mon   Absent
+    # Output:
+        # Fri  Sandwich
+        # Sat  Sandwich
+        # Sun  Sandwich
+    # Thu   Absent
+    # Fri   Holiday
+    # Sat   Leave
+    # Sun   Weekly Off
+    # Mon   Absent
+    # Result:
+        # NO sandwich
 # ------------------------------------------------------------
 def _run_sandwich_for_employee(employee, from_date, to_date, hol_dates):
     logging.debug(f"_run_sandwich_for_employee {employee} from {from_date} to {to_date} with holidays on {hol_dates}")   
     created = 0
     cleared = 0
     d = from_date
+
     while d <= to_date:
         if d not in hol_dates:
             d = add_days(d, 1)
             continue
         block_start = d
         block_end = d
+        # build holiday block
         while add_days(block_end, 1) in hol_dates:
             block_end = add_days(block_end, 1)
-        prev_day = _prev_working_day(block_start, hol_dates)
-        next_day = _next_working_day(block_end, hol_dates)
-        if not prev_day or not next_day:
-            d = add_days(block_end, 1)
-            continue
+        prev_day = add_days(block_start, -1)
+        next_day = add_days(block_end, 1)
         prev_status = _get_attendance_status(employee, prev_day)
         next_status = _get_attendance_status(employee, next_day)
+        # leave breaks sandwich
+        if _has_leave(employee, prev_day) or _has_leave(employee, next_day):
+            d = add_days(block_end, 1)
+            continue
+        # sandwich condition
         if prev_status == "Absent" and next_status == "Absent":
             x = block_start
             while x <= block_end:
@@ -158,7 +195,18 @@ def _run_sandwich_for_employee(employee, from_date, to_date, hol_dates):
             cleared += _clear_sandwich_block(employee, block_start, block_end)
         d = add_days(block_end, 1)
     return {"created": created, "cleared": cleared}
-           
+
+def _has_leave(employee, date):
+
+    return frappe.db.exists(
+        "Leave Application",
+        {
+            "employee": employee,
+            "from_date": ("<=", date),
+            "to_date": (">=", date),
+            "docstatus": 1
+        }
+    )       
 # ------------------------------------------------------------
 # Working day helpers
 # ------------------------------------------------------------
