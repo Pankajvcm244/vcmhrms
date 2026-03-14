@@ -42,9 +42,8 @@ def get_company_lock_and_windows(_company=None):
     """
     settings = frappe.get_cached_doc("VCM HR Settings")  # cached, fast
     locked_upto = getdate(settings.attendance_locked_upto) if settings.attendance_locked_upto else None
-    repair_days = int(getattr(settings, "repair_window_days", 10) or 10)
     last_repair_run_at = get_datetime(settings.last_repair_run_at) if settings.last_repair_run_at else None     
-    return locked_upto, repair_days, last_repair_run_at
+    return locked_upto, last_repair_run_at
 
 
 class VCMShiftType(HRMSShiftType):
@@ -54,7 +53,7 @@ class VCMShiftType(HRMSShiftType):
     def get_effective_checkin_start_date(self):
         """
             Routine scan lower bound:
-            max( locked_upto + 1, today - repair_days, process_attendance_after )
+            max( locked_upto + 1, process_attendance_after )
         """
         # logger.debug(f" in get_effective_checkin_start_date") 
         settings = frappe.get_cached_doc("VCM HR Settings")
@@ -65,15 +64,7 @@ class VCMShiftType(HRMSShiftType):
         lock_date = settings.attendance_locked_upto
         lock_start = add_days(getdate(lock_date), 1) if lock_date else None
 
-        # repair window
-        repair_days = cint(getattr(settings, "repair_window_days", 3) or 0)
-        repair_start = add_days(today_date, -repair_days) if repair_days else None
-        # CRITICAL: do not allow repair to cross payroll lock
-        # ensure repair window never crosses payroll lock
-        if repair_start and lock_start and getdate(repair_start) < getdate(lock_start):
-            repair_start = lock_start
-
-        candidates = [getdate(d) for d in [shift_start, lock_start, repair_start] if d]
+        candidates = [getdate(d) for d in [shift_start, lock_start] if d]
         # logger.debug(f"Computed for shift {self.name}: \n"
         #              f"    shift_start={shift_start} \n"
         #              f"    lock_start={lock_start} \n"
@@ -172,12 +163,11 @@ class VCMShiftType(HRMSShiftType):
         # -------------------------------------------------------
         
         repair_start = now_datetime()
-        locked_upto, repair_days, last_run = get_company_lock_and_windows()
+        locked_upto, last_run = get_company_lock_and_windows()
         # logger.debug(f" locked_upto {locked_upto}, repair_days {repair_days}, last_run {last_run} ")
-        today = getdate(nowdate())
-        repair_floor = add_days(today, -repair_days)
+       
         if locked_upto:
-            repair_floor = max(repair_floor, add_days(locked_upto, 1))
+            repair_floor = add_days(locked_upto, 1)
             # logger.debug(f" Adjusted repair_floor based on lock: {repair_floor}")
          # incremental window
         from_dt = get_datetime(last_run) if last_run else add_days(repair_start, -1)
@@ -193,7 +183,6 @@ class VCMShiftType(HRMSShiftType):
                 "Employee Checkin",
                 filters={
                     "modified": (">", from_dt),
-                    "skip_auto_attendance": 0,
                     "time": (">=", repair_floor),
                     "offshift": 0,
                     # "shift": self.name,
@@ -283,6 +272,11 @@ class VCMShiftType(HRMSShiftType):
                                     f"repair: cancelled sandwich leave {leave_doc.name} "
                                     f"employee={employee} date={adate}"
                                 )
+                                frappe.delete_doc(
+                                    "Leave Application",
+                                    leave_doc.name,
+                                    force=1
+                                )
                         except Exception:
                             logger.exception("sandwich cancel failed")
                 # ---------------------------------------------------
@@ -292,6 +286,7 @@ class VCMShiftType(HRMSShiftType):
                     att_doc = frappe.get_doc("Attendance", attendance.name)
                     if att_doc.docstatus == 1:
                         att_doc.cancel()
+                        frappe.delete_doc("Attendance", att_doc.name, force=1)
 
                     logger.debug(
                         f"repair: cancelled attendance {attendance.name} "

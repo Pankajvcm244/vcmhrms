@@ -7,7 +7,6 @@
  "field_order": [
   "vcm_hr_settings_section",
   "attendance_locked_upto",
-  "repair_window_days",
   "allowed_late_entry_count",
   "column_break_ptio",
   "last_repair_run_at"
@@ -16,7 +15,9 @@
   {
    "fieldname": "attendance_locked_upto",
    "fieldtype": "Date",
-   "label": "Attendance Locked Upto"
+   "in_list_view": 1,
+   "label": "Attendance Locked Upto",
+   "reqd": 1
   },
   {
    "fieldname": "vcm_hr_settings_section",
@@ -30,26 +31,25 @@
   {
    "fieldname": "last_repair_run_at",
    "fieldtype": "Datetime",
-   "label": "Last Repair Run At"
+   "label": "Last Repair Run At",
+   "read_only": 1
   },
   {
    "default": "3",
    "fieldname": "allowed_late_entry_count",
    "fieldtype": "Int",
-   "label": "Allowed Late Entry Count"
-  },
-  {
-   "fieldname": "repair_window_days",
-   "fieldtype": "Int",
-   "label": "Repair Window Days"
+   "in_list_view": 1,
+   "label": "Allowed Late Entry Count",
+   "read_only": 1,
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-10 15:26:25.142716",
- "modified_by": "Administrator",
+ "modified": "2026-03-14 15:05:26.471859",
+ "modified_by": "pankaj.sharma@vcm.org.in",
  "module": "VCM HRMS",
  "name": "VCM HR Settings",
  "owner": "Administrator",

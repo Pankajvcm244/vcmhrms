@@ -377,18 +377,19 @@ def _clear_sandwich_block(employee, start, end):
 
         # If either boundary day has work → sandwich breaks
         if prev_worked or next_worked:
-
             leave_doc = frappe.get_doc("Leave Application", row.name)
             leave_doc.cancel()
-
+            frappe.delete_doc(
+                "Leave Application",
+                leave_doc.name,
+                force=1
+            )
             logger.info(
                 f"Sandwich leave cancelled for {employee} "
                 f"({leave_start} to {leave_end}) "
                 f"prev_worked={prev_worked} next_worked={next_worked}"
             )
-
             cleared += 1
-
     return cleared
 
 
@@ -418,5 +419,10 @@ def clear_sandwich_if_checkin(employee, date):
     for name in leaves:
         doc = frappe.get_doc("Leave Application", name)
         doc.cancel()
+        frappe.delete_doc(
+            "Leave Application",
+            doc.name,
+            force=1
+        )
         logger.info(f"Sandwich leave cancelled due to checkin: {employee} {date}")
 
