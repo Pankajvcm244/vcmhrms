@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 def fix_existing_attendance(doc, method):
     # never allow Leave Application to create attendance if attendance already exists.
     # Only handle half-day leave case, as full day leave will not create attendance record at all.
-    logger.debug(f"Checking for existing attendance for Leave Application {doc.name} of employee {doc.employee} on date {doc.from_date}")
+    # logger.debug(f"Checking for existing attendance for Leave Application {doc.name} of employee {doc.employee} on date {doc.from_date}")
     if not doc.half_day:
-        logger.debug("Not a half-day leave, skipping attendance fix.")
+        # logger.debug("Not a half-day leave, skipping attendance fix.")
         return
     
     attendance = frappe.db.get_value(
@@ -24,7 +24,7 @@ def fix_existing_attendance(doc, method):
         as_dict=True,
     )
     if not attendance:
-        logger.debug("No existing attendance found, skipping attendance fix.")
+        # logger.debug("No existing attendance found, skipping attendance fix.")
         return
     att_doc = frappe.get_doc("Attendance", attendance.name)
     # Before modifying attendance, confirm it is not already linked to another leave:
@@ -34,7 +34,7 @@ def fix_existing_attendance(doc, method):
         )
     # Cancel if submitted
     if att_doc.docstatus == 1:
-        logger.debug(f"Attendance {att_doc.name} is submitted, direct DB modification.")
+        # logger.debug(f"Attendance {att_doc.name} is submitted, direct DB modification.")
         frappe.db.set_value(
             "Attendance",
             att_doc.name,
@@ -46,7 +46,7 @@ def fix_existing_attendance(doc, method):
             },
         )
     else:
-        logger.debug(f"Attendance {att_doc.name} is not submitted, modifying by saving directly.")
+        # logger.debug(f"Attendance {att_doc.name} is not submitted, modifying by saving directly.")
         att_doc.status = "Half Day"
         att_doc.leave_type = doc.leave_type
         att_doc.leave_application = doc.name

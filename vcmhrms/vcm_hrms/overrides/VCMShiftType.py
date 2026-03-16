@@ -129,8 +129,7 @@ class VCMShiftType(HRMSShiftType):
     import frappe
     shift = frappe.get_doc("Shift Type", "GENERAL9_30_to_6_00")
     shift.process_auto_attendance()
-    """ 
- 
+    """  
     def process_auto_attendance(self, is_manually_triggered=False):
         # logger.debug("in process_auto_attendance (forcing safe non-manual mode)")
         # Then do targeted repair for late-arriving punches,  
@@ -138,9 +137,7 @@ class VCMShiftType(HRMSShiftType):
         self.reconcile_late_checkins()
         # Run standard HRMS auto attendance (creates/updates based on unlinked checkins)
          # 2) Now HRMS sees those checkins as unlinked and will recreate attendance immediately
-        super().process_auto_attendance(is_manually_triggered=False)
-
-            
+        super().process_auto_attendance(is_manually_triggered=False)            
 
     def reconcile_late_checkins(self):        
         """
@@ -160,12 +157,10 @@ class VCMShiftType(HRMSShiftType):
         frappe.flags.vcm_repair_running = True      
         # -------------------------------------------------------
         # Capture repair start time (important for incremental safety)
-        # -------------------------------------------------------
-        
+        # -------------------------------------------------------        
         repair_start = now_datetime()
         locked_upto, last_run = get_company_lock_and_windows()
-        # logger.debug(f" locked_upto {locked_upto}, repair_days {repair_days}, last_run {last_run} ")
-       
+        # logger.debug(f" locked_upto {locked_upto}, repair_days {repair_days}, last_run {last_run} ")       
         if locked_upto:
             repair_floor = add_days(locked_upto, 1)
             # logger.debug(f" Adjusted repair_floor based on lock: {repair_floor}")
@@ -191,8 +186,8 @@ class VCMShiftType(HRMSShiftType):
                 order_by="employee, time asc",
                 limit_page_length=5000,
             )
-            if self.name == "GENERAL9_30_to_6_00":
-                logger.debug(f" reconcile_late_checkins  Found {(checkins)} checkins to reconcile for shift {self.name}")    
+            # if self.name == "GENERAL9_30_to_6_00":
+            #     logger.debug(f" reconcile_late_checkins  Found {(checkins)} checkins to reconcile for shift {self.name}")    
             if not checkins:
                 return
             # -------------------------------------------------------
@@ -237,12 +232,11 @@ class VCMShiftType(HRMSShiftType):
                 # Case 1 — no attendance (holiday / weekoff)
                 # ---------------------------------------------------
                 if not attendance:
-                    logger.debug(
-                        f"[repair] no attendance employee={employee} date={adate}"
-                    )
+                    # logger.debug(
+                    #     f"[repair] no attendance employee={employee} date={adate}"
+                    # )
                     # unlink logs so HRMS can rebuild attendance
                     _unlink_day_checkins(employee, adate)
-
                     # find shift from checkins
                     shift_name = frappe.db.get_value(
                         "Employee Checkin",
@@ -268,10 +262,10 @@ class VCMShiftType(HRMSShiftType):
                             )
                             if leave_doc.docstatus == 1:
                                 leave_doc.cancel()
-                                logger.debug(
-                                    f"repair: cancelled sandwich leave {leave_doc.name} "
-                                    f"employee={employee} date={adate}"
-                                )
+                                # logger.debug(
+                                #     f"repair: cancelled sandwich leave {leave_doc.name} "
+                                #     f"employee={employee} date={adate}"
+                                # )
                                 frappe.delete_doc(
                                     "Leave Application",
                                     leave_doc.name,
@@ -288,10 +282,10 @@ class VCMShiftType(HRMSShiftType):
                         att_doc.cancel()
                         frappe.delete_doc("Attendance", att_doc.name, force=1)
 
-                    logger.debug(
-                        f"repair: cancelled attendance {attendance.name} "
-                        f"employee={employee} date={adate}"
-                    )
+                    # logger.debug(
+                    #     f"repair: cancelled attendance {attendance.name} "
+                    #     f"employee={employee} date={adate}"
+                    # )
                 # ---------------------------------------------------
                 # Unlink checkins so HRMS recomputes
                 # ---------------------------------------------------
@@ -302,9 +296,9 @@ class VCMShiftType(HRMSShiftType):
             # Rebuild attendance once per shift
             # -----------------------------------------------------
             for shift_name in shifts_to_rebuild:
-                logger.debug(
-                    f"[repair] rebuilding attendance for shift {shift_name}"
-                )
+                # logger.debug(
+                #     f"[repair] rebuilding attendance for shift {shift_name}"
+                # )
                 shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
                 shift_doc.process_auto_attendance()
         finally:
@@ -357,7 +351,6 @@ def _unlink_day_checkins(employee: str, attendance_date):
         """
         day_start = get_datetime(f"{attendance_date} 00:00:00")
         day_end = get_datetime(f"{add_days(attendance_date, 1)} 00:00:00")
-
         frappe.db.sql(
             """
             UPDATE `tabEmployee Checkin`
@@ -376,16 +369,13 @@ def _attendance_date_for_punch(shift, punch_dt):
     Works for overnight shifts.
     """
     d = getdate(punch_dt)
-
     w1s, w1e = _shift_scan_window(shift, d)
     if w1s and w1e and w1s <= punch_dt <= w1e:
         return d
-
     prev = add_days(d, -1)
     w2s, w2e = _shift_scan_window(shift, prev)
     if w2s and w2e and w2s <= punch_dt <= w2e:
         return prev
-
     return d
 
 def _to_time(t):
@@ -435,7 +425,6 @@ def _shift_base_bounds(shift, attendance_date):
 def _get_grace_minutes(shift):
     """
     Read grace minutes from Shift Type.
-
     IMPORTANT:
     Field names may vary slightly across HRMS versions.
     Adjust here ONLY if your fieldnames differ.
@@ -471,132 +460,132 @@ def _shift_scan_window(shift, attendance_date):
 # ❌ DO NOT recreate attendance
 # ✅ Update in_time/out_time/working_hours
 # ✅ Link valid checkins
-def _sync_leave_attendance_times(att, employee: str, adate) -> bool:
-    """
-    Update leave-driven Attendance using real punches.
-    Returns True if anything changed.
-    """
-    # ------------------------------------------------------------
-    # 1) Determine shift for this day
-    # ------------------------------------------------------------
-    shift_name = att.get("shift")
-    # If Attendance has no shift (can happen), try to infer from checkins first
-    if not shift_name:
-        inferred = frappe.get_value(
-            "Employee Checkin",
-            {"employee": employee, "skip_auto_attendance": 0, "offshift": 0, "time": ("between", [adate, add_days(adate, 1)])},
-            "shift",
-        )
-        if inferred:
-            shift_name = inferred
-    # If still missing, we cannot compute window safely
-    if not shift_name:
-        # logger.debug(f"[LEAVE-SYNC] No shift on Attendance and could not infer shift from checkins for {employee} {adate}")
-        return False
-    shift = frappe.get_cached_doc("Shift Type", shift_name)
+# def _sync_leave_attendance_times(att, employee: str, adate) -> bool:
+#     """
+#     Update leave-driven Attendance using real punches.
+#     Returns True if anything changed.
+#     """
+#     # ------------------------------------------------------------
+#     # 1) Determine shift for this day
+#     # ------------------------------------------------------------
+#     shift_name = att.get("shift")
+#     # If Attendance has no shift (can happen), try to infer from checkins first
+#     if not shift_name:
+#         inferred = frappe.get_value(
+#             "Employee Checkin",
+#             {"employee": employee, "skip_auto_attendance": 0, "offshift": 0, "time": ("between", [adate, add_days(adate, 1)])},
+#             "shift",
+#         )
+#         if inferred:
+#             shift_name = inferred
+#     # If still missing, we cannot compute window safely
+#     if not shift_name:
+#         # logger.debug(f"[LEAVE-SYNC] No shift on Attendance and could not infer shift from checkins for {employee} {adate}")
+#         return False
+#     shift = frappe.get_cached_doc("Shift Type", shift_name)
 
-     # ------------------------------------------------------------
-    # 2) Compute valid scan window (overnight + grace)
-    # ------------------------------------------------------------
-    win_start, win_end = _shift_scan_window(shift, adate)
-    # logger.debug(f"Computed scan window for leave-driven attendance sync for employee={employee} date={adate} shift={shift.name}: win_start={win_start} win_end={win_end}") 
-    if not win_start or not win_end:
-        return False
-    # logger.debug(f"Syncing leave attendance for employee={employee} date={adate} using shift {shift.name} with scan window {win_start} to {win_end}")   
-    # ------------------------------------------------------------
-    # 3) Fetch valid checkins within window
-    # ------------------------------------------------------------
-    logs = frappe.get_all(
-        "Employee Checkin",
-        filters={
-            "employee": employee,
-            "skip_auto_attendance": 0,
-            "offshift": 0,
-            "time": ("between", [win_start, win_end]),
-        },
-        fields=["name", "time", "shift"],
-        order_by="time asc",
-        limit_page_length=5000,
-    )
-    if not logs:
-        # logger.debug(f"[LEAVE-SYNC] No valid checkins in window for {employee} {adate}")
-        return False
-    # Prefer logs mapped to same shift (keeps you close to HRMS)
-    same_shift = [l for l in logs if l.get("shift") == shift.name]
-    if same_shift:
-        logs = same_shift
-    # ------------------------------------------------------------
-    # 4) Compute day in/out and working hours from those logs
-    # ------------------------------------------------------------
-    in_dt = min(get_datetime(x.time) for x in logs)
-    out_dt = max(get_datetime(x.time) for x in logs)
-    seconds = max(0, (out_dt - in_dt).total_seconds())
-    wh = flt(seconds / 3600.0, 2)
-    old_in = att.get("in_time")
-    old_out = att.get("out_time")
-    old_wh = att.get("working_hours")
-    # logger.debug(
-    #     f"[LEAVE-SYNC] {employee} {adate}: old_in={old_in} old_out={old_out} old_wh={old_wh} "
-    #     f"new_in={in_dt} new_out={out_dt} new_wh={wh}"
-    # )
-    # ------------------------------------------------------------
-    # 5) Update Attendance without changing leave status, we can not use save as doc is already submitted
-    # ------------------------------------------------------------
-    frappe.db.set_value(
-        "Attendance",
-        att["name"],
-        {
-            "in_time": in_dt,
-            "out_time": out_dt,
-            "working_hours": wh,
-            "shift": shift.name,
-        },
-    )
-    #  now update all flags
-    att_doc = frappe.get_doc("Attendance", att["name"])
-    # update memory object
-    att_doc.in_time = in_dt
-    att_doc.out_time = out_dt
-    att_doc.working_hours = wh
-    att_doc.shift = shift.name
-    # run the same policy logic that validate() normally runs
-    from vcmhrms.vcm_hrms.overrides.attendance_hooks import (
-        apply_nonflex_strict_hours,
-        enforce_late_entry_policy,
-    )
-    # logger.debug(f"Applying attendance policies for leave-driven attendance sync for {employee} {adate}")   
-    apply_nonflex_strict_hours(att_doc)
-    enforce_late_entry_policy(att_doc)
-    frappe.db.set_value(
-        "Attendance",
-        att_doc.name,
-        {
-            "in_time": in_dt,
-            "out_time": out_dt,
-            "working_hours": wh,
-            "shift": shift.name,
-            "late_entry": att_doc.late_entry,
-            "early_exit": att_doc.early_exit,
-            "custom_late_entry_within_grace": att_doc.custom_late_entry_within_grace,
-            "custom_first_half_done": att_doc.custom_first_half_done,
-            "custom_second_half_done": att_doc.custom_second_half_done,
-            "custom_sandwich_applied": att_doc.custom_sandwich_applied,
-            "custom_created_by_sandwich": att_doc.custom_created_by_sandwich,
-        },
-    )
-    # ------------------------------------------------------------
-    # 6) Link only these logs to the existing leave Attendance
-    # ------------------------------------------------------------
-    names = [l["name"] for l in logs]
-    frappe.db.sql(
-        f"""
-        UPDATE `tabEmployee Checkin`
-        SET attendance = %s
-        WHERE name IN ({",".join(["%s"] * len(names))})
-        """,
-        tuple([att["name"]] + names),
-    )
-    return True
+#      # ------------------------------------------------------------
+#     # 2) Compute valid scan window (overnight + grace)
+#     # ------------------------------------------------------------
+#     win_start, win_end = _shift_scan_window(shift, adate)
+#     # logger.debug(f"Computed scan window for leave-driven attendance sync for employee={employee} date={adate} shift={shift.name}: win_start={win_start} win_end={win_end}") 
+#     if not win_start or not win_end:
+#         return False
+#     # logger.debug(f"Syncing leave attendance for employee={employee} date={adate} using shift {shift.name} with scan window {win_start} to {win_end}")   
+#     # ------------------------------------------------------------
+#     # 3) Fetch valid checkins within window
+#     # ------------------------------------------------------------
+#     logs = frappe.get_all(
+#         "Employee Checkin",
+#         filters={
+#             "employee": employee,
+#             "skip_auto_attendance": 0,
+#             "offshift": 0,
+#             "time": ("between", [win_start, win_end]),
+#         },
+#         fields=["name", "time", "shift"],
+#         order_by="time asc",
+#         limit_page_length=5000,
+#     )
+#     if not logs:
+#         # logger.debug(f"[LEAVE-SYNC] No valid checkins in window for {employee} {adate}")
+#         return False
+#     # Prefer logs mapped to same shift (keeps you close to HRMS)
+#     same_shift = [l for l in logs if l.get("shift") == shift.name]
+#     if same_shift:
+#         logs = same_shift
+#     # ------------------------------------------------------------
+#     # 4) Compute day in/out and working hours from those logs
+#     # ------------------------------------------------------------
+#     in_dt = min(get_datetime(x.time) for x in logs)
+#     out_dt = max(get_datetime(x.time) for x in logs)
+#     seconds = max(0, (out_dt - in_dt).total_seconds())
+#     wh = flt(seconds / 3600.0, 2)
+#     old_in = att.get("in_time")
+#     old_out = att.get("out_time")
+#     old_wh = att.get("working_hours")
+#     # logger.debug(
+#     #     f"[LEAVE-SYNC] {employee} {adate}: old_in={old_in} old_out={old_out} old_wh={old_wh} "
+#     #     f"new_in={in_dt} new_out={out_dt} new_wh={wh}"
+#     # )
+#     # ------------------------------------------------------------
+#     # 5) Update Attendance without changing leave status, we can not use save as doc is already submitted
+#     # ------------------------------------------------------------
+#     frappe.db.set_value(
+#         "Attendance",
+#         att["name"],
+#         {
+#             "in_time": in_dt,
+#             "out_time": out_dt,
+#             "working_hours": wh,
+#             "shift": shift.name,
+#         },
+#     )
+#     #  now update all flags
+#     att_doc = frappe.get_doc("Attendance", att["name"])
+#     # update memory object
+#     att_doc.in_time = in_dt
+#     att_doc.out_time = out_dt
+#     att_doc.working_hours = wh
+#     att_doc.shift = shift.name
+#     # run the same policy logic that validate() normally runs
+#     from vcmhrms.vcm_hrms.overrides.attendance_hooks import (
+#         apply_nonflex_strict_hours,
+#         enforce_late_entry_policy,
+#     )
+#     # logger.debug(f"Applying attendance policies for leave-driven attendance sync for {employee} {adate}")   
+#     apply_nonflex_strict_hours(att_doc)
+#     enforce_late_entry_policy(att_doc)
+#     frappe.db.set_value(
+#         "Attendance",
+#         att_doc.name,
+#         {
+#             "in_time": in_dt,
+#             "out_time": out_dt,
+#             "working_hours": wh,
+#             "shift": shift.name,
+#             "late_entry": att_doc.late_entry,
+#             "early_exit": att_doc.early_exit,
+#             "custom_late_entry_within_grace": att_doc.custom_late_entry_within_grace,
+#             "custom_first_half_done": att_doc.custom_first_half_done,
+#             "custom_second_half_done": att_doc.custom_second_half_done,
+#             "custom_sandwich_applied": att_doc.custom_sandwich_applied,
+#             "custom_created_by_sandwich": att_doc.custom_created_by_sandwich,
+#         },
+#     )
+#     # ------------------------------------------------------------
+#     # 6) Link only these logs to the existing leave Attendance
+#     # ------------------------------------------------------------
+#     names = [l["name"] for l in logs]
+#     frappe.db.sql(
+#         f"""
+#         UPDATE `tabEmployee Checkin`
+#         SET attendance = %s
+#         WHERE name IN ({",".join(["%s"] * len(names))})
+#         """,
+#         tuple([att["name"]] + names),
+#     )
+#     return True
 
 
 @frappe.whitelist()
@@ -617,7 +606,7 @@ def run_auto_attendance_now(employee: str | None = None):
     #     "".join(traceback.format_stack())
     # )
     # logger.debug(f"Manual trigger for auto attendance by user {frappe.session.user} for employee {employee}")
-    logging.debug(f"[run_auto_attendance_now] Manual trigger details: {details}")
+    # logging.debug(f"[run_auto_attendance_now] Manual trigger details: {details}")
     processed = 0
     errors = 0
     if employee:

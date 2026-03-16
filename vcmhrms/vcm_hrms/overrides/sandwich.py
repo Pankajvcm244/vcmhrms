@@ -163,7 +163,7 @@ def _get_attendance_status(employee, date):
         # NO sandwich
 # ------------------------------------------------------------
 def _run_sandwich_for_employee(employee, from_date, to_date, hol_dates):
-    logging.debug(f"_run_sandwich_for_employee {employee} from {from_date} to {to_date} with holidays on {hol_dates}")   
+    # logging.debug(f"_run_sandwich_for_employee {employee} from {from_date} to {to_date} with holidays on {hol_dates}")   
     created = 0
     cleared = 0
     d = from_date
@@ -253,10 +253,10 @@ def _apply_sandwich_day(employee, date):
         second_half = int(att.get("custom_second_half_done") or 0)
         # If any half done → employee worked enough
         if first_half or second_half:
-            logger.debug(
-                f"Sandwich skipped for {employee} on {date} "
-                f"(first_half_done={first_half}, second_half_done={second_half})"
-            )
+            # logger.debug(
+            #     f"Sandwich skipped for {employee} on {date} "
+            #     f"(first_half_done={first_half}, second_half_done={second_half})"
+            # )
             return 0
         # If attendance exists but not enough work → still skip creating leave
         # because attendance engine should decide status
@@ -276,7 +276,7 @@ def _apply_sandwich_day(employee, date):
         pluck="name",
     )
     if existing:
-        logger.debug(f"Sandwich leave already exists for {employee} on {date}, skipping creation")
+        # logger.debug(f"Sandwich leave already exists for {employee} on {date}, skipping creation")
         return 0
     # ------------------------------------------------------------
     # Create Sandwich Leave
@@ -294,7 +294,7 @@ def _apply_sandwich_day(employee, date):
     )
     leave.insert(ignore_permissions=True)
     leave.submit()
-    logger.debug(f"Sandwich leave created for {employee} on {date}")
+    # logger.debug(f"Sandwich leave created for {employee} on {date}")
     return 1
 
 
@@ -307,11 +307,8 @@ def _apply_sandwich_day(employee, date):
 # boundary_day_worked → clear sandwich
 # ------------------------------------------------------------
 def _clear_sandwich_block(employee, start, end):
-
     cleared = 0
-
-    logger.debug(f"Clearing sandwich block for {employee} from {start} to {end}")
-
+    # logger.debug(f"Clearing sandwich block for {employee} from {start} to {end}")
     leaves = frappe.get_all(
         "Leave Application",
         filters={
@@ -323,15 +320,11 @@ def _clear_sandwich_block(employee, start, end):
         },
         fields=["name", "from_date", "to_date"],
     )
-
     for row in leaves:
-
         leave_start = getdate(row.from_date)
         leave_end = getdate(row.to_date)
-
         prev_day = add_days(leave_start, -1)
         next_day = add_days(leave_end, 1)
-
         prev_att = frappe.db.get_value(
             "Attendance",
             {
@@ -345,7 +338,6 @@ def _clear_sandwich_block(employee, start, end):
             ],
             as_dict=True
         )
-
         next_att = frappe.db.get_value(
             "Attendance",
             {
@@ -359,22 +351,18 @@ def _clear_sandwich_block(employee, start, end):
             ],
             as_dict=True
         )
-
         prev_worked = False
         next_worked = False
-
         if prev_att:
             prev_worked = (
                 int(prev_att.get("custom_first_half_done") or 0) or
                 int(prev_att.get("custom_second_half_done") or 0)
             )
-
         if next_att:
             next_worked = (
                 int(next_att.get("custom_first_half_done") or 0) or
                 int(next_att.get("custom_second_half_done") or 0)
             )
-
         # If either boundary day has work → sandwich breaks
         if prev_worked or next_worked:
             leave_doc = frappe.get_doc("Leave Application", row.name)

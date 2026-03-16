@@ -383,7 +383,7 @@ def apply_nonflex_strict_hours(doc, method=None):
             AND docstatus=1
             AND attendance_date BETWEEN %s AND %s
             AND IFNULL(custom_late_entry_within_grace, 0) = 1
-            AND status='Present'
+            AND status IN ('Present','Half Day')
             AND name != %s
             """,
             (doc.employee, period_start, period_end, doc.name or ""),
@@ -470,7 +470,17 @@ def apply_nonflex_strict_hours(doc, method=None):
             if new_status != "Half Day":
                 doc.half_day_status = None
             elif not doc.half_day_status:
-                doc.half_day_status = "Absent"  
+                # if employee applied hald day leave and then hald day punch comes
+                #  we need to mark half day status as present because leave application
+                #  will create attendance with half day status as present and if punch comes 
+                #  after that we should not mark it as absent
+                if doc.leave_application or doc.leave_type:
+                    if first_half_done or second_half_done:
+                        doc.half_day_status = "Present"
+                    else:
+                        doc.half_day_status = "Absent"
+                else:
+                    doc.half_day_status = "Absent"  
 
 def _strict_shift_bounds_for_attendance(shift, attendance_date, in_dt, out_dt):
     """
