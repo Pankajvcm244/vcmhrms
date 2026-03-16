@@ -94,7 +94,7 @@ class VCMShiftType(HRMSShiftType):
             if logs:
                 return logs
             # Fallback only if HRMS returns nothing (keeps you close to standard)
-            last_sync = self.last_sync_of_checkin or now_datetime()
+            last_sync = now_datetime()
             # logger.debug(f"[VCM] HRMS get_employee_checkins shift {self.name} returned 0; using fallback query")
 
             manual_logs =  frappe.get_all(
