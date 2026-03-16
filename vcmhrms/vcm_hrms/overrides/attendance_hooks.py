@@ -375,19 +375,17 @@ def apply_nonflex_strict_hours(doc, method=None):
         settings = frappe.get_cached_doc("VCM HR Settings")
         allowed = cint(getattr(settings, "allowed_late_entry_count", 0) or 0)
         period_start, period_end = _payroll_period_for_date(doc.attendance_date)
-        used_other = frappe.db.sql(
-            """
-            SELECT COUNT(*)
-            FROM `tabAttendance`
-            WHERE employee=%s
-            AND docstatus=1
-            AND attendance_date BETWEEN %s AND %s
-            AND IFNULL(custom_late_entry_within_grace, 0) = 1
-            AND status IN ('Present','Half Day')
-            AND name != %s
-            """,
-            (doc.employee, period_start, period_end, doc.name or ""),
-        )[0][0] or 0
+        used_other = frappe.db.count(
+            "Attendance",
+            {
+                "employee": doc.employee,
+                "docstatus": ["!=", 2],
+                "attendance_date": ["between", [period_start, period_end]],
+                "custom_late_entry_within_grace": 1,
+                "status": ["in", ["Present", "Half Day"]],
+                "name": ["!=", doc.name],
+            },
+        )
         if used_other < allowed:
             allow_relaxation = 1
         else:
@@ -436,10 +434,11 @@ def apply_nonflex_strict_hours(doc, method=None):
         or getattr(doc, "leave_type", None)
         or (doc.status or "").strip().lower() == "on leave"
     )
-    if is_leave_attendance:
-        # logger.debug(
-        #     f"[apply_nonflex_strict_hours] Skipping status recompute for leave-driven attendance {doc.name}"
-        # )
+   
+    if (doc.status or "").strip().lower() == "on leave":
+        # Skip only full leave, half day leave may have punch also and we
+        #  need to process that attendance and mark half day status as present in that case
+        # logger.debug(f"[apply_nonflex_strict_hours 7.1] Attendance {doc.name} is marked as 'On Leave'. Skipping status override but will evaluate half-day status if applicable.")
         return
     absent_thr = getattr(shift, "working_hours_threshold_for_absent", None)
     half_day_thr = getattr(shift, "working_hours_threshold_for_half_day", None)
@@ -454,10 +453,9 @@ def apply_nonflex_strict_hours(doc, method=None):
         new_status = "Present"
     else:
         new_status = "Half Day"
-  
-    # logger.debug(f"[apply_nonflex_strict_hours 8] For {doc.name} wh={wh} first_half_done={first_half_done} second_half_done={second_half_done} new_status={new_status}")    
     # Early exit can never be Present (best case Half Day)
     if cint(getattr(doc, "early_exit", 0) or 0) and new_status == "Present":
+        # logger.debug(f"[apply_nonflex_strict_hours 9] {doc.name} has early exit. Downgrading from Present to Half Day.")    
         new_status = "Half Day"
     # Apply if changed
     if (doc.status or "").strip() != new_status:
@@ -466,21 +464,31 @@ def apply_nonflex_strict_hours(doc, method=None):
         #     f"wh={wh} first_half_done={first_half_done} second_half_done={second_half_done} early_exit={getattr(doc,'early_exit',None)}"
         # )
         doc.status = new_status
-        if hasattr(doc, "half_day_status"):
-            if new_status != "Half Day":
-                doc.half_day_status = None
-            elif not doc.half_day_status:
-                # if employee applied hald day leave and then hald day punch comes
-                #  we need to mark half day status as present because leave application
-                #  will create attendance with half day status as present and if punch comes 
-                #  after that we should not mark it as absent
-                if doc.leave_application or doc.leave_type:
-                    if first_half_done or second_half_done:
-                        doc.half_day_status = "Present"
-                    else:
-                        doc.half_day_status = "Absent"
+
+    # Always evaluate half_day_status when status is Half Day
+    if hasattr(doc, "half_day_status"):
+        # logger.debug(f"[apply_nonflex_strict_hours 11.1] Evaluating half_day_status for {doc.name} with new_status={new_status}")
+        if new_status != "Half Day":
+            # logger.debug(f"[apply_nonflex_strict_hours 11.1.1] {doc.name} is not Half Day. Clearing half_day_status.") 
+            doc.half_day_status = None
+        else:
+            # half day leave + punch case
+            # if employee applied hald day leave and then hald day punch comes
+            #  we need to mark half day status as present because leave application
+            #  will create attendance with half day status as present and if punch comes 
+            #  after that we should not mark it as absent
+            # logger.debug(f"[apply_nonflex_strict_hours 11.2] Marking half_day_status for {doc.name} based on leave application and punch data: leave_application={doc.leave_application} leave_type={doc.leave_type} first_half_done={first_half_done} second_half_done={second_half_done}")
+            if doc.leave_application or doc.leave_type:
+                # logger.debug(f"[apply_nonflex_strict_hours 12] Marking half_day_status as Present for {doc.name} due to half-day leave application")
+                if first_half_done or second_half_done:
+                    doc.half_day_status = "Present"
                 else:
-                    doc.half_day_status = "Absent"  
+                    doc.half_day_status = "Absent"
+            else:
+                # logger.debug(f"[apply_nonflex_strict_hours 12] Marking half_day_status as Absent for {doc.name} due to no half-day leave application")
+                doc.half_day_status = "Absent"  
+    # else:
+    #     logger.debug(f"[apply_nonflex_strict_hours 11] No status change for {doc.name}. Status remains {doc.status} with wh={wh} first_half_done={first_half_done} second_half_done={second_half_done} early_exit={getattr(doc,'early_exit',None)}")
 
 def _strict_shift_bounds_for_attendance(shift, attendance_date, in_dt, out_dt):
     """
@@ -640,9 +648,21 @@ def enforce_late_entry_policy(doc, method=None):
                 doc.status = "Present"
             else:
                 doc.status = "Half Day"
+             # ---------------------------------------------------------
+            # Fix half-day status logic
+            # ---------------------------------------------------------
             if hasattr(doc, "half_day_status"):
+                # logger.debug(
+                #     f"[enforce_late_entry_policy 2] Recomputing half_day_status for {doc.name} after quota exhaustion. new_status={doc.status}" )
                 if doc.status == "Half Day":
-                    doc.half_day_status = "Absent"
+                    # If half-day leave + employee worked → Present
+                    if doc.leave_application or doc.leave_type:
+                        if second_half_done or first_half_done:
+                            doc.half_day_status = "Present"
+                        else:
+                            doc.half_day_status = "Absent"
+                    else:
+                        doc.half_day_status = "Absent"                   
                 else:
                     doc.half_day_status = None
         else:

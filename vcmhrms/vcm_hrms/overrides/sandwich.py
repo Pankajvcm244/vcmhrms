@@ -325,46 +325,12 @@ def _clear_sandwich_block(employee, start, end):
         leave_end = getdate(row.to_date)
         prev_day = add_days(leave_start, -1)
         next_day = add_days(leave_end, 1)
-        prev_att = frappe.db.get_value(
-            "Attendance",
-            {
-                "employee": employee,
-                "attendance_date": prev_day,
-                "docstatus": 1
-            },
-            [
-                "custom_first_half_done",
-                "custom_second_half_done"
-            ],
-            as_dict=True
-        )
-        next_att = frappe.db.get_value(
-            "Attendance",
-            {
-                "employee": employee,
-                "attendance_date": next_day,
-                "docstatus": 1
-            },
-            [
-                "custom_first_half_done",
-                "custom_second_half_done"
-            ],
-            as_dict=True
-        )
-        prev_worked = False
-        next_worked = False
-        if prev_att:
-            prev_worked = (
-                int(prev_att.get("custom_first_half_done") or 0) or
-                int(prev_att.get("custom_second_half_done") or 0)
-            )
-        if next_att:
-            next_worked = (
-                int(next_att.get("custom_first_half_done") or 0) or
-                int(next_att.get("custom_second_half_done") or 0)
-            )
-        # If either boundary day has work → sandwich breaks
-        if prev_worked or next_worked:
+        prev_status = _get_attendance_status(employee, prev_day)
+        next_status = _get_attendance_status(employee, next_day)
+
+        # sandwich must exist ONLY when both sides are Absent
+        # when boundaries change you must ensure all sandwich leaves inside the block are removed, not just first.
+        if prev_status != "Absent" or next_status != "Absent":
             leave_doc = frappe.get_doc("Leave Application", row.name)
             leave_doc.cancel()
             frappe.delete_doc(
@@ -375,7 +341,7 @@ def _clear_sandwich_block(employee, start, end):
             logger.info(
                 f"Sandwich leave cancelled for {employee} "
                 f"({leave_start} to {leave_end}) "
-                f"prev_worked={prev_worked} next_worked={next_worked}"
+                f"prev_status={prev_status} next_status={next_status}"
             )
             cleared += 1
     return cleared
