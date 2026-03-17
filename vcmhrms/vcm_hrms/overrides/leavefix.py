@@ -1,5 +1,5 @@
-
-
+# Copyright (c) 2026, Pankaj Sharma and contributors
+# For license information, please see license.txt
 
 import frappe
 import logging
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 def fix_existing_attendance(doc, method):
     # never allow Leave Application to create attendance if attendance already exists.
     # Only handle half-day leave case, as full day leave will not create attendance record at all.
-    # logger.debug(f"Checking for existing attendance for Leave Application {doc.name} of employee {doc.employee} on date {doc.from_date}")
+    # logger.debug(f"Checking for existing attendance for Leave Application {doc.name} of employee {doc.employee} {doc.half_day}  on date {doc.from_date}")
     if not doc.half_day:
         # logger.debug("Not a half-day leave, skipping attendance fix.")
         return
@@ -18,7 +18,7 @@ def fix_existing_attendance(doc, method):
         {
             "employee": doc.employee,
             "attendance_date": doc.from_date,
-            "docstatus": ("<", 2),
+            "docstatus": 1
         },
         ["name", "status"],
         as_dict=True,
@@ -42,7 +42,7 @@ def fix_existing_attendance(doc, method):
                 "status": "Half Day",
                 "leave_type": doc.leave_type,
                 "leave_application": doc.name,
-                "half_day_status": "On Leave",
+                "half_day_status": "Absent",
             },
         )
     else:
@@ -50,5 +50,5 @@ def fix_existing_attendance(doc, method):
         att_doc.status = "Half Day"
         att_doc.leave_type = doc.leave_type
         att_doc.leave_application = doc.name
-        att_doc.half_day_status = "On Leave"
+        att_doc.half_day_status = "Absent"
         att_doc.save(ignore_permissions=True)

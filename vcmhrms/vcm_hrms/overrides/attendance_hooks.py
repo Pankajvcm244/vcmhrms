@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Pankaj Sharma and contributors
+# For license information, please see license.txt
+
 import frappe
 from frappe.utils import get_datetime, getdate, add_days, flt, cint, nowdate
 from datetime import datetime, timedelta, time as pytime
@@ -408,7 +411,7 @@ def apply_nonflex_strict_hours(doc, method=None):
         second_half_hours = max(0, (eff_out - sh_start).total_seconds()) / 3600
     required_second_half_hours = (strict_end - lunch_end).total_seconds() / 3600
     second_half_done = 1 if second_half_hours >= required_second_half_hours else 0
-    logger.debug(f"[apply_nonflex_strict_hours 6]  wh={wh} second_half_hours={second_half_hours} required_second_half_hours={required_second_half_hours} second_half_done={second_half_done}")
+    # logger.debug(f"[apply_nonflex_strict_hours 6]  wh={wh} second_half_hours={second_half_hours} required_second_half_hours={required_second_half_hours} second_half_done={second_half_done}")
     # ----------------------------
     # Persist Half Completion Flags
     # ----------------------------
@@ -566,7 +569,9 @@ def enforce_late_entry_policy(doc, method=None):
     if not (doc.employee and doc.attendance_date and doc.shift):
         return
     status_lc = (doc.status or "").strip().lower()
+    # Never override Absent
     if status_lc == "absent":
+        # logger.debug(f"[enforce_late_entry_policy] Skipping {doc.name} because status is Absent")
         return
     if status_lc == "on leave" or doc.leave_application or doc.leave_type:
         return
@@ -578,7 +583,7 @@ def enforce_late_entry_policy(doc, method=None):
     # ---------------------------------------------------------
     within_grace = cint(getattr(doc, "custom_late_entry_within_grace", 0) or 0)
     if not within_grace:
-        pass  # continue to early-exit evaluation later
+        return  # Because the policy only applies to grace lateness
     else:
         # ---------------------------------------------------------
         # Validate true grace window
@@ -621,7 +626,7 @@ def enforce_late_entry_policy(doc, method=None):
             "Attendance",
             {
                 "employee": doc.employee,
-                "docstatus": ["!=", 2],
+                "docstatus": 1,
                 "attendance_date": ["between", [period_start, period_end]],
                 "custom_late_entry_within_grace": 1,
                 "status": ["in", ["Present", "Half Day"]],
