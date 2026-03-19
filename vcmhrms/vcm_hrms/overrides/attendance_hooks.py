@@ -116,19 +116,23 @@ def apply_valid_window_in_out(doc, method=None):
     - Deterministic: every validate recomputes first/last across the full candidate list.
     """
     # Prevent recursion if any downstream code triggers validate again
+    # logger.debug(f"[apply_valid_window_in_out 1] Validating {doc.name} time={getattr(doc,'time',None)} shift={getattr(doc,'shift',None)} employee={getattr(doc,'employee',None)}")
     if getattr(frappe.flags, "vcm_inout_guard", False):
+        logger.debug(f"[apply_valid_window_in_out 2] Guard active, skipping validation for {doc.name}")   
         return
     # Must have employee + time + shift
     if not doc.employee or not doc.time or not doc.shift:
+        logger.debug(f"[apply_valid_window_in_out 3] Missing employee/time/shift, skipping validation for {doc.name}")    
         return
     try:
         frappe.flags.vcm_inout_guard = True
         shift = frappe.get_cached_doc("Shift Type", doc.shift)
         # Optional: if you really want ONE flexible shift where pure duration counts,
-        # don't force IN/OUT. Let HRMS handle it.
-        if int(getattr(shift, "custom_flexible_shift", 0) or 0):
-            # logger.debug(f"[apply_valid_window_in_out] Shift {shift.name} is flexible; skipping valid window logic")
-            return
+        # We need to force IN/OUT otheriwse IN OUT will be missing.
+        #  we need to force IN Out so that hrms takes it better
+        # if int(getattr(shift, "custom_flexible_shift", 0) or 0):
+        #     logger.debug(f"[apply_valid_window_in_out 4] Shift {shift.name} is flexible; skipping valid window logic")
+        #     return
         
         # ----------------------------
         # 1)  Resolve correct grace window for this punch  (overnight-safe)
@@ -136,6 +140,7 @@ def apply_valid_window_in_out(doc, method=None):
         # ----------------------------
         punch_dt = get_datetime(doc.time)
         if not punch_dt:
+            logger.debug(f"[apply_valid_window_in_out 5] Invalid punch datetime for {doc.name}: {doc.time}")    
             return
         # ------------------------------------------------------------
         # 1) Resolve correct grace window for this punch (overnight-safe)
@@ -148,11 +153,13 @@ def apply_valid_window_in_out(doc, method=None):
         if w1_start and w1_end and w1_start <= punch_dt <= w1_end:
             w_start, w_end = w1_start, w1_end
         if not w_start or not w_end:
+            logger.debug(f"[apply_valid_window_in_out 6] Could not determine grace window for {doc.name} on date {d0} or {d1}. Skipping validation.")
             return
         # logger.debug(f"[apply_valid_window_in_out] Validating checkin {doc.name} time={punch_dt} ")
         # Outside grace window => ignored by HRMS
         if punch_dt < w_start or punch_dt > w_end:
             doc.offshift = 1
+            logger.debug(f"[apply_valid_window_in_out 7] Punch {doc.name} at {punch_dt} is outside grace window ({w_start} to {w_end}). Marking offshift=1.")   
             return
         # Inside window => always on-shift, but log_type (IN/OUT) to be determined by position in window
         doc.offshift = 0 
@@ -160,6 +167,7 @@ def apply_valid_window_in_out(doc, method=None):
         # reclassify the entire window (because we cannot include it safely).
         # Next validate after insert will reclassify correctly.
         if not doc.name:
+            logger.debug(f"[apply_valid_window_in_out 8] Doc {doc} has no name yet. Skipping deterministic IN/OUT classification for now; will apply on next validate after insert.")
             return
         
         # ------------------------------------------------------------
@@ -181,10 +189,11 @@ def apply_valid_window_in_out(doc, method=None):
             filters=filters,
             fields=["name", "time", "skip_auto_attendance", "log_type"],
             order_by="time asc",
-            limit_page_length=2000,
+            limit_page_length=5000,
         )
         # If nothing in DB yet, let the next validate classify.
         if not db_logs:
+            logger.debug(f"[apply_valid_window_in_out 9] No existing punches in DB for employee {doc.employee} shift {doc.shift} between {w_start} and {w_end}. Skipping deterministic IN/OUT classification for now; will apply on next validate after insert.")   
             return
         
         # Build candidate list INCLUDING current doc even if not in DB yet
@@ -195,6 +204,7 @@ def apply_valid_window_in_out(doc, method=None):
         # Sort by time to find first/last deterministically
         candidates.sort(key=lambda r: get_datetime(r["time"]))
         if not candidates:
+            logger.debug(f"[apply_valid_window_in_out 10] No candidates found after including current doc {doc.name}. This should not happen as we checked db_logs already. Skipping classification.")  
             return
         first_name = candidates[0]["name"]
         last_name = candidates[-1]["name"]
