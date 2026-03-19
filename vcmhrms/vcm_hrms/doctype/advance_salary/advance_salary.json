@@ -1,0 +1,205 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-18 11:20:43.769172",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_ykv2",
+  "amended_from",
+  "section_break_gfdo",
+  "employee",
+  "employee_name",
+  "column_break_nopu",
+  "company",
+  "posting_date",
+  "remarks",
+  "section_break_bkwm",
+  "advance_amount",
+  "start_date",
+  "end_date",
+  "column_break_ubdd",
+  "deduction_component",
+  "deduction_start_month",
+  "recovery_months",
+  "recovery_amount",
+  "connection_tab"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_ykv2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Advance Salary",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_gfdo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_nopu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_bkwm",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "advance_amount",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Advance Amount",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ubdd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "recovery_months",
+   "fieldtype": "Int",
+   "label": "Recovery Months",
+   "reqd": 1
+  },
+  {
+   "fieldname": "recovery_amount",
+   "fieldtype": "Float",
+   "label": "Recovery Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deduction_component",
+   "fieldtype": "Link",
+   "label": "Deduction Component",
+   "link_filters": "[[\"Salary Component\",\"type\",\"=\",\"Deduction\"]]",
+   "options": "Salary Component",
+   "reqd": 1
+  },
+  {
+   "fieldname": "deduction_start_month",
+   "fieldtype": "Select",
+   "label": "Deduction Start Month",
+   "options": "\nJan\nFeb\nMar\nApr\nMay\nJun\nJul\nAug\nSep\nOct\nNov\nDec",
+   "reqd": 1
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "End Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "connection_tab",
+   "fieldtype": "Tab Break",
+   "label": "Connection",
+   "show_dashboard": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [
+  {
+   "link_doctype": "Additional Salary",
+   "link_fieldname": "ref_docname"
+  }
+ ],
+ "modified": "2026-03-19 14:39:17.262218",
+ "modified_by": "Administrator",
+ "module": "VCM HRMS",
+ "name": "Advance Salary",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "ERP Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
