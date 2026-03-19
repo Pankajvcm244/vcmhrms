@@ -133,8 +133,12 @@ app_license = "mit"
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
 override_doctype_class = {
-    "Shift Type": "vcmhrms.vcm_hrms.overrides.VCMShiftType.VCMShiftType"
+    "Shift Type": "vcmhrms.vcm_hrms.overrides.VCMShiftType.VCMShiftType",
+    "Salary Structure": "vcmhrms.vcm_hrms.overrides.VcmSalaryStructure.VcmSalaryStructure"
 }
+
+
+
 # Document Events
 # ---------------
 # Hook on document methods and events
