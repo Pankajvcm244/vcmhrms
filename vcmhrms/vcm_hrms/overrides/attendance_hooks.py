@@ -118,11 +118,11 @@ def apply_valid_window_in_out(doc, method=None):
     # Prevent recursion if any downstream code triggers validate again
     # logger.debug(f"[apply_valid_window_in_out 1] Validating {doc.name} time={getattr(doc,'time',None)} shift={getattr(doc,'shift',None)} employee={getattr(doc,'employee',None)}")
     if getattr(frappe.flags, "vcm_inout_guard", False):
-        logger.debug(f"[apply_valid_window_in_out 2] Guard active, skipping validation for {doc.name}")   
+        # logger.debug(f"[apply_valid_window_in_out 2] Guard active, skipping validation for {doc.name}")   
         return
     # Must have employee + time + shift
     if not doc.employee or not doc.time or not doc.shift:
-        logger.debug(f"[apply_valid_window_in_out 3] Missing employee/time/shift, skipping validation for {doc.name}")    
+        # logger.debug(f"[apply_valid_window_in_out 3] Missing employee/time/shift, skipping validation for {doc.name}")    
         return
     try:
         frappe.flags.vcm_inout_guard = True
@@ -140,7 +140,7 @@ def apply_valid_window_in_out(doc, method=None):
         # ----------------------------
         punch_dt = get_datetime(doc.time)
         if not punch_dt:
-            logger.debug(f"[apply_valid_window_in_out 5] Invalid punch datetime for {doc.name}: {doc.time}")    
+            # logger.debug(f"[apply_valid_window_in_out 5] Invalid punch datetime for {doc.name}: {doc.time}")    
             return
         # ------------------------------------------------------------
         # 1) Resolve correct grace window for this punch (overnight-safe)
@@ -153,13 +153,13 @@ def apply_valid_window_in_out(doc, method=None):
         if w1_start and w1_end and w1_start <= punch_dt <= w1_end:
             w_start, w_end = w1_start, w1_end
         if not w_start or not w_end:
-            logger.debug(f"[apply_valid_window_in_out 6] Could not determine grace window for {doc.name} on date {d0} or {d1}. Skipping validation.")
+            # logger.debug(f"[apply_valid_window_in_out 6] Could not determine grace window for {doc.name} on date {d0} or {d1}. Skipping validation.")
             return
         # logger.debug(f"[apply_valid_window_in_out] Validating checkin {doc.name} time={punch_dt} ")
         # Outside grace window => ignored by HRMS
         if punch_dt < w_start or punch_dt > w_end:
             doc.offshift = 1
-            logger.debug(f"[apply_valid_window_in_out 7] Punch {doc.name} at {punch_dt} is outside grace window ({w_start} to {w_end}). Marking offshift=1.")   
+            # logger.debug(f"[apply_valid_window_in_out 7] Punch {doc.name} at {punch_dt} is outside grace window ({w_start} to {w_end}). Marking offshift=1.")   
             return
         # Inside window => always on-shift, but log_type (IN/OUT) to be determined by position in window
         doc.offshift = 0 
@@ -167,7 +167,7 @@ def apply_valid_window_in_out(doc, method=None):
         # reclassify the entire window (because we cannot include it safely).
         # Next validate after insert will reclassify correctly.
         if not doc.name:
-            logger.debug(f"[apply_valid_window_in_out 8] Doc {doc} has no name yet. Skipping deterministic IN/OUT classification for now; will apply on next validate after insert.")
+            # logger.debug(f"[apply_valid_window_in_out 8] Doc {doc} has no name yet. Skipping deterministic IN/OUT classification for now; will apply on next validate after insert.")
             return
         
         # ------------------------------------------------------------
@@ -193,7 +193,7 @@ def apply_valid_window_in_out(doc, method=None):
         )
         # If nothing in DB yet, let the next validate classify.
         if not db_logs:
-            logger.debug(f"[apply_valid_window_in_out 9] No existing punches in DB for employee {doc.employee} shift {doc.shift} between {w_start} and {w_end}. Skipping deterministic IN/OUT classification for now; will apply on next validate after insert.")   
+            # logger.debug(f"[apply_valid_window_in_out 9] No existing punches in DB for employee {doc.employee} shift {doc.shift} between {w_start} and {w_end}. Skipping deterministic IN/OUT classification for now; will apply on next validate after insert.")   
             return
         
         # Build candidate list INCLUDING current doc even if not in DB yet
@@ -204,7 +204,7 @@ def apply_valid_window_in_out(doc, method=None):
         # Sort by time to find first/last deterministically
         candidates.sort(key=lambda r: get_datetime(r["time"]))
         if not candidates:
-            logger.debug(f"[apply_valid_window_in_out 10] No candidates found after including current doc {doc.name}. This should not happen as we checked db_logs already. Skipping classification.")  
+            # logger.debug(f"[apply_valid_window_in_out 10] No candidates found after including current doc {doc.name}. This should not happen as we checked db_logs already. Skipping classification.")  
             return
         first_name = candidates[0]["name"]
         last_name = candidates[-1]["name"]
@@ -279,6 +279,9 @@ def apply_nonflex_strict_hours(doc, method=None):
     """
     # logger.debug(f"[apply_nonflex_strict_hours 1] Evaluating {doc.name} for non-flex strict hours enforcement")     
     # Ignore attendance created by sandwich logic to prevent conflicts.
+     # 🚨 ONLY run during auto attendance rebuild, this flag is set in reconcile_late_checkin
+    if not getattr(frappe.flags, "in_auto_attendance_run", False):
+        return
     if getattr(doc, "docstatus", 0) == 2:
         return
     # Must have context + in/out
@@ -286,6 +289,12 @@ def apply_nonflex_strict_hours(doc, method=None):
         return
     if not getattr(doc, "in_time", None) or not getattr(doc, "out_time", None):
         return
+    shift = frappe.get_cached_doc("Shift Type", doc.shift)
+    
+    if cint(getattr(shift, "custom_flexible_shift", 0) or 0):
+        # logger.debug(f"[apply_nonflex_strict_hours 2] Shift {shift.name} is flexible; skipping strict hours enforcement for {doc.name}")
+        return
+    # logger.debug(f"[apply_nonflex_strict_hours 3] Shift {shift.name} is non-flex; applying strict hours enforcement for {doc.name}")
     # Skip leave-driven attendance
     status_lc = (getattr(doc, "status", "") or "").strip().lower()
     #  On leave status if for full day leave, for half day it is "Half Day"
@@ -299,9 +308,7 @@ def apply_nonflex_strict_hours(doc, method=None):
         # allow processing if actual punches exist
         if not (getattr(doc, "in_time", None) and getattr(doc, "out_time", None)):
             return
-    shift = frappe.get_cached_doc("Shift Type", doc.shift)
-    if cint(getattr(shift, "custom_flexible_shift", 0) or 0):
-        return
+    
     in_dt = get_datetime(doc.in_time)
     out_dt = get_datetime(doc.out_time)
     if not in_dt or not out_dt or out_dt <= in_dt:
@@ -412,7 +419,7 @@ def apply_nonflex_strict_hours(doc, method=None):
     if allow_relaxation:
         required_first_half_hours = max(0, required_first_half_hours - late_grace / 60)
     first_half_done = 1 if first_half_hours >= required_first_half_hours else 0
-    logger.debug(f"[apply_nonflex_strict_hours 5]  wh={wh} first_half_hours={first_half_hours} required_first_half_hours={required_first_half_hours} first_half_done={first_half_done}")
+    # logger.debug(f"[apply_nonflex_strict_hours 5]  wh={wh} first_half_hours={first_half_hours} required_first_half_hours={required_first_half_hours} first_half_done={first_half_done}")
 
     # Second half considered "completed" only if employee was present at/after lunch_end AND stayed till strict_end.
     # This enforces your "second half has no quota and must complete full 4 hours".
@@ -503,16 +510,95 @@ def apply_nonflex_strict_hours(doc, method=None):
             if doc.leave_application or doc.leave_type:
                 # sometime even without punch half day leave was makign other half present, so now w eare checking punch also.
                 has_punch = bool(doc.in_time and doc.out_time)
-                # logger.debug(f"[apply_nonflex_strict_hours 12] punch {has_punch} (doc.in_time={doc.in_time}, doc.out_time={doc.out_time}) Marking half_day_status as Present for {doc.name} due to half-day leave application")
                 if has_punch and (first_half_done or second_half_done):
+                    # logger.debug(f"[apply_nonflex_strict_hours 12] punch {has_punch} (doc.in_time={doc.in_time}, doc.out_time={doc.out_time}) Marking half_day_status as Present for {doc.name} due to half-day leave application")
                     doc.half_day_status = "Present"
+                    doc.db_set("half_day_status", "Present", update_modified=False)
+                    logger.debug(
+                        f"[HALF DAY FINAL] {doc.name} status={doc.status} half_day_status={doc.half_day_status}"
+                    )
                 else:
-                    doc.half_day_status = "Absent"
+                    # logger.debug(f"[apply_nonflex_strict_hours 12-1] No valid punch (doc.in_time={doc.in_time}, doc.out_time={doc.out_time}) Marking half_day_status as Absent for {doc.name} despite half-day leave application")
+                    # 🚨 DO NOT downgrade if already Present (multi-run safe)
+                    if doc.half_day_status != "Present":
+                        doc.half_day_status = "Absent"
             else:
                 # logger.debug(f"[apply_nonflex_strict_hours 12-1] Marking half_day_status as Absent for {doc.name} due to no half-day leave application")
-                doc.half_day_status = "Absent"  
+                # 🚨 DO NOT downgrade if already Present (multi-run safe)
+                if doc.half_day_status != "Present":
+                    doc.half_day_status = "Absent"  
     # else:
     #     logger.debug(f"[apply_nonflex_strict_hours 11] No status change for {doc.name}. Status remains {doc.status} with wh={wh} first_half_done={first_half_done} second_half_done={second_half_done} early_exit={getattr(doc,'early_exit',None)}")
+
+
+
+
+def apply_flex_min_hours(doc, method=None):
+    logging.debug(f"[apply_flex_min_hours] Evaluating {doc.name} for flexible shift minimum hours enforcement")
+    # if not getattr(frappe.flags, "in_auto_attendance_run", False):
+    #     logger.debug(f"[apply_flex_min_hours] Not in auto attendance run; skipping flexible hours enforcement for {doc.name}")
+    #     return
+
+    if not doc.shift:
+        return
+    if getattr(doc, "docstatus", 0) == 2:
+        return
+    if not doc.shift or not doc.in_time or not doc.out_time:
+        return
+    shift = frappe.get_cached_doc("Shift Type", doc.shift)
+    # ✅ ONLY FLEX HERE
+    if not cint(getattr(shift, "custom_flexible_shift", 0)):
+        logger.debug(f"[apply_flex_min_hours] Shift {shift.name} is not flexible; skipping flex hours enforcement for {doc.name}")
+        return
+    in_dt = get_datetime(doc.in_time)
+    out_dt = get_datetime(doc.out_time)
+    if not in_dt or not out_dt or out_dt <= in_dt:
+        return
+    # ----------------------------
+    # PURE DURATION
+    # ----------------------------
+    wh = flt((out_dt - in_dt).total_seconds() / 3600.0, 2)
+    doc.working_hours = wh
+    absent_thr = float(getattr(shift, "working_hours_threshold_for_absent", 0) or 0)
+    half_day_thr = float(getattr(shift, "working_hours_threshold_for_half_day", 0) or 0)
+    logger.debug(
+        f"[FLEX] Evaluating {doc.name} with working_hours={wh} against absent_thr={absent_thr} half_day_thr={half_day_thr}" 
+    )
+    # ----------------------------
+    # STATUS DECISION
+    # ----------------------------
+    if wh < absent_thr:
+        new_status = "Absent"
+    elif wh < half_day_thr:
+        new_status = "Half Day"
+
+    else:
+        new_status = "Present"
+    # DO NOT override full leave
+    if (doc.status or "").strip().lower() == "on leave":
+        return
+    # ----------------------------
+    # APPLY
+    # ----------------------------
+    if doc.status != new_status:
+        doc.status = new_status
+    # ----------------------------
+    # HALF DAY STATUS
+    # ----------------------------
+    if hasattr(doc, "half_day_status"):
+        if new_status == "Half Day":
+            # 🔥 Check if leave exists
+            has_leave = bool(doc.leave_application or doc.leave_type)
+            if has_leave:
+                doc.half_day_status = "Present"
+            else:
+                doc.half_day_status = "Absent"
+        else:
+            doc.half_day_status = None
+    logger.debug(
+        f"[FLEX] {doc.name} status={doc.status} wh={wh}"
+    )
+
 
 def _strict_shift_bounds_for_attendance(shift, attendance_date, in_dt, out_dt):
     """

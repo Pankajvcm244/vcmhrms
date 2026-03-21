@@ -4,8 +4,10 @@
 import frappe
 from frappe.utils import getdate, nowdate, add_days, now_datetime, get_datetime, cint, flt, today
 import logging
+import random
 from datetime import datetime, timedelta, time as pytime
 from hrms.hr.doctype.shift_type.shift_type import ShiftType as HRMSShiftType
+from vcmhrms.vcm_hrms.overrides.attendance_hooks import apply_nonflex_strict_hours
 logger = logging.getLogger(__name__)
 SANDWICH_LEAVE_TYPE = "Sandwich Absent"
 
@@ -121,6 +123,8 @@ class VCMShiftType(HRMSShiftType):
         finally:
             self.process_attendance_after = original
 
+    
+
     # ---------------------------------------
     # Window 2: repair window for late arrivals
     #  ----------------------------------------
@@ -139,7 +143,7 @@ class VCMShiftType(HRMSShiftType):
          # 2) Now HRMS sees those checkins as unlinked and will recreate attendance immediately
         super().process_auto_attendance(is_manually_triggered=False)            
 
-    def reconcile_late_checkins(self):        
+    def reconcile_late_checkins(self, repair_start=None):       
         """
         Repair attendance when late punches arrive.
         Handles:
@@ -154,44 +158,51 @@ class VCMShiftType(HRMSShiftType):
         #  recurrsion lock  
         if getattr(frappe.flags, "vcm_repair_running", False):
             return
-        frappe.flags.vcm_repair_running = True      
+        frappe.flags.vcm_repair_running = True
+         
         # -------------------------------------------------------
         # Capture repair start time (important for incremental safety)
         # -------------------------------------------------------        
-        repair_start = now_datetime()
+        if not repair_start:
+            repair_start = now_datetime()
         locked_upto, last_run = get_company_lock_and_windows()
-        # logger.debug(f" locked_upto {locked_upto}, repair_days {repair_days}, last_run {last_run} ")       
+        # if self.name == "GENERAL9_30_to_6_00":
+        # logger.debug(f" shift {self.name} ,locked_upto {locked_upto}, repair_start {repair_start}, last_run {last_run} ")       
+        repair_floor = None
         if locked_upto:
             repair_floor = add_days(locked_upto, 1)
             # logger.debug(f" Adjusted repair_floor based on lock: {repair_floor}")
          # incremental window
         from_dt = get_datetime(last_run) if last_run else add_days(repair_start, -1)
         # if self.name == "GENERAL9_30_to_6_00":
-        #     logger.debug(f"reconcile_late_checkins checkins {from_dt} (repair {repair_floor}) shift {self.name}") 
+        #     logger.debug(f"reconcile_late_checkins 1 checkins {from_dt} (repair {repair_floor}) shift {self.name}") 
         # Prevent parallel repair runs           # 
         shifts_to_rebuild = set()     
         try:
             # -------------------------------------------------------
             # Fetch late or modified checkins
-            # -------------------------------------------------------
+            # ------------------------------------------------------- 
             checkins = frappe.get_all(
                 "Employee Checkin",
                 filters={
                     "modified": (">", from_dt),
                     "time": (">=", repair_floor),
                     "offshift": 0,
-                    # "shift": self.name,
+                    "shift": self.name,
                 },
                 fields=["employee", "time", "shift"],
                 order_by="employee, time asc",
                 limit_page_length=5000,
             )
-            # if self.name == "GENERAL9_30_to_6_00":
-            #     logger.debug(f" reconcile_late_checkins  Found {(checkins)} checkins to reconcile for shift {self.name}")    
-            if not checkins:
-                return
+            if self.name == "Flexy":
+                logger.debug(f"reconcile_late_checkins checkins {(checkins)} , to reconcile for shift {self.name}")    
+            # if not checkins:
+            #     # logger.debug(f"reconcile_late_checkins 0 no checkins to reconcile for shift {self.name}")
+            #     # Dont return here we may have updated attendence.
+            #     pass
             # -------------------------------------------------------
             # Build impacted employee-day buckets
+            #  first add where attendance has changed.
             # -------------------------------------------------------
             buckets = set()
             for c in checkins:
@@ -207,13 +218,85 @@ class VCMShiftType(HRMSShiftType):
                     continue
                 if adate < repair_floor:
                     continue
-                buckets.add((c.employee, adate))
+                buckets.add((c.employee, adate, c.shift))
+            # -------------------------------------------------------
+            # Check Leave Update as we need to process them also  
+            # -------------------------------------------------------
+            leave_updates = frappe.get_all(
+                "Leave Application",
+                filters={
+                    "modified": (">", from_dt),
+                    "docstatus": ("<", 2)
+                },
+                fields=["employee", "from_date", "to_date", "half_day", "half_day_date"]
+            )
+            if self.name == "Flexy":
+                logger.debug(f" reconcile_late_checkins 1-1 leave_updates {leave_updates} {from_dt} shift {self.name}") 
+            for l in leave_updates:
+                if l.half_day:
+                    d = l.half_day_date
+                    if not d:
+                        continue
+                    if locked_upto and d <= locked_upto:
+                        continue
+                    if repair_floor and d < repair_floor:
+                        continue
+                    buckets.add((l.employee, d))
+                else:
+                    for d in date_range(l.from_date, l.to_date):
+                        if locked_upto and d <= locked_upto:
+                            continue
+                        if repair_floor and d < repair_floor:
+                            continue
+                        buckets.add((l.employee, d))
+            # -------------------------------------------------------
+            # Check Attendence Update as we need to process them also  
+            # -------------------------------------------------------  
+            # First extract impacted employees from attendance updates, then fetch all attendance updates for those employees to build buckets.
+            #  This is to avoid fetching too many attendance records when we have many checkins but few attendances.
+            employees = {c.employee for c in checkins}
+            employees.update(l.employee for l in leave_updates)         
+            # attendance_updates = frappe.get_all(
+            #     "Attendance",
+            #     filters={
+            #         "modified": (">", from_dt),
+            #         "docstatus": ("<", 2),
+            #         "employee": ("in", list(employees)),  
+            #         # "shift": self.name,
+            #         "status": ["!=", "Absent"], 
+            #     },
+            #     fields=["employee", "attendance_date", "shift"],
+            # )
+            # if self.name == "Flexy":
+            #     logger.debug(f" reconcile_late_checkins  attendence {(attendance_updates)} attendances updated since {from_dt} to reconcile for shift {self.name}")
+            # for att in attendance_updates:
+            #     # if self.name == "GENERAL9_30_to_6_00":
+            #     #     logger.debug(f"reconcile_late_checkins 2 attendance update employee {att.employee} date {att.attendance_date} shift {att.shift}")
+            #     if locked_upto and att.attendance_date <= locked_upto:
+            #         continue
+            #     if repair_floor and att.attendance_date < repair_floor:
+            #         continue                
+            #     buckets.add((att.employee, att.attendance_date))
+            #     # if self.name == "GENERAL9_30_to_6_00":
+            #     #     logger.debug(f"reconcile_late_checkins 3 attendance update employee {att.employee} date {att.attendance_date} shift {att.shift} added to buckets")
+
             if not buckets:
+                if self.name == "Flexy":
+                    logger.debug(f"reconcile_late_checkins 4 no buckets to reconcile for shift {self.name}")    
                 return
             # -------------------------------------------------------
             # Build impacted employee-day buckets
             # -------------------------------------------------------
-            for employee, adate in sorted(buckets):
+            processed_attendance = set()
+            for employee, adate in sorted(buckets): 
+                logger.debug(f"Reconciling attendance for employee {employee} date {adate} shift {self.name}")               
+                # unlink flag
+                unlinked = False  # ✅ reset per bucket
+                #  Key to avoid duplicates even if multiple checkins/attendances for same employee-date
+                att_key = f"{employee}::{adate}"
+                if att_key in processed_attendance:
+                    continue
+                processed_attendance.add(att_key)                
                 attendance = frappe.get_value(
                     "Attendance",
                     {"employee": employee, "attendance_date": adate, "docstatus": ("<", 2)},
@@ -228,6 +311,10 @@ class VCMShiftType(HRMSShiftType):
                     ],
                     as_dict=True,
                 )
+                if attendance and attendance.docstatus == 2:
+                    continue
+                # if self.name == "GENERAL9_30_to_6_00":
+                #     logger.debug(f"Processing bucket employee {employee} date {adate} attendance {attendance}")
                 # ---------------------------------------------------
                 # Case 1 — no attendance (holiday / weekoff)
                 # ---------------------------------------------------
@@ -237,12 +324,16 @@ class VCMShiftType(HRMSShiftType):
                     # )
                     # unlink logs so HRMS can rebuild attendance
                     _unlink_day_checkins(employee, adate)
+                    unlinked = True   # set flag
                     # find shift from checkins
                     shift_name = frappe.db.get_value(
                         "Employee Checkin",
                         {
                             "employee": employee,
-                            "time": ("between", [adate, add_days(adate, 1)]),
+                            "time": ("between", [
+                                get_datetime(adate),
+                                get_datetime(add_days(adate, 1))
+                            ]),
                             "offshift": 0
                         },
                         "shift"
@@ -250,71 +341,195 @@ class VCMShiftType(HRMSShiftType):
                     if shift_name:
                         shifts_to_rebuild.add(shift_name) 
                     continue
+                
                 # ---------------------------------------------------
-                # Sandwich leave handling
-                # ---------------------------------------------------
-                if attendance.leave_type == SANDWICH_LEAVE_TYPE:
-                    if attendance.leave_application:
-                        try:
-                            leave_doc = frappe.get_doc(
-                                "Leave Application",
-                                attendance.leave_application
-                            )
-                            if leave_doc.docstatus == 1:
-                                leave_doc.cancel()
-                                # logger.debug(
-                                #     f"repair: cancelled sandwich leave {leave_doc.name} "
-                                #     f"employee={employee} date={adate}"
-                                # )
-                                frappe.delete_doc(
-                                    "Leave Application",
-                                    leave_doc.name,
-                                    force=1
-                                )
-                        except Exception:
-                            logger.exception("sandwich cancel failed")
-                # ---------------------------------------------------
-                # Cancel existing attendance
+                # Cancel existing attendance only for non leave-driven attendance
                 # ---------------------------------------------------
                 if attendance.docstatus == 1:
-                    att_doc = frappe.get_doc("Attendance", attendance.name)
-                    if att_doc.docstatus == 1:
-                        att_doc.cancel()
-                        frappe.delete_doc("Attendance", att_doc.name, force=1)
-
-                    # logger.debug(
-                    #     f"repair: cancelled attendance {attendance.name} "
-                    #     f"employee={employee} date={adate}"
-                    # )
+                    # 🚨 DO NOT delete leave-based attendance, as half day leave is followed by half day punch
+                    if attendance.leave_application or attendance.leave_type:
+                        # ✅ DO NOT DELETE
+                        # Just unlink checkins so recalculation happens on same record
+                        if not unlinked:
+                            # if self.name == "GENERAL9_30_to_6_00":
+                            #     logger.debug(f"reconcile_late_checkins 3-1 is leave-based; unlinking checkins for employee {employee} to trigger recalculation")
+                            _unlink_day_checkins(employee, adate)
+                            unlinked = True   # set flag                        
+                        try:
+                            # if self.name == "GENERAL9_30_to_6_00":
+                            #     logger.debug(f"reconcile_late_checkins 4-1 attendance {attendance.name} is leave-based; {attendance.shift} shift; ")    
+                            # ADD THIS BLOCK HERE to force attendence hooks to trigger
+                            att_doc = frappe.get_doc("Attendance", attendance.name)
+                                                      
+                            # # FORCE CHANGE (guaranteed)
+                            # att_doc.custom_recompute_trigger = random.randint(1, 10**9)                        
+                            # # 🔥 DO NOT SKIP VALIDATE
+                            # att_doc.flags.ignore_validate = False
+                            # # allow update
+                            # att_doc.save(ignore_permissions=True)
+                        except Exception:
+                            logger.exception(
+                                f"[repair] failed to force recompute for {attendance.name}"
+                            )
+                        shift_name = attendance.shift
+                        # 🔥 Fallback 1 — from checkin (BEST source)
+                        if not shift_name:
+                            shift_name = frappe.db.get_value(
+                                "Employee Checkin",
+                                {
+                                    "employee": employee,
+                                    "time": ("between", [
+                                        get_datetime(add_days(adate, -1)),
+                                        get_datetime(add_days(adate, 2))
+                                    ]),
+                                    "offshift": 0
+                                },
+                                "shift",
+                                order_by="time asc"
+                            )
+                        if shift_name:
+                            shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
+                            punch_dt = frappe.db.get_value(
+                                "Employee Checkin",
+                                {
+                                    "employee": employee,
+                                    "shift": shift_name,
+                                    "time": ("between", [
+                                        get_datetime(add_days(adate, -1)),
+                                        get_datetime(add_days(adate, 2))
+                                    ]),
+                                    "offshift": 0
+                                },
+                                "time",
+                                order_by="time asc"
+                            )
+                            derived_date = _attendance_date_for_punch(shift_doc, punch_dt)
+                            if derived_date != adate:
+                                shift_name = None
+                            if shift_name:
+                                # logger.debug(f"reconcile_late_checkins 4-2 attendance {attendance.name} is leave-based; adding shift {shift_name} to rebuild list for employee {employee} date {adate}")
+                                shifts_to_rebuild.add(shift_name)
+                    else:
+                        # Normal flow (non-leave)
+                        # 🔥 FIRST: find shift BEFORE deleting
+                        shift_name = attendance.shift
+                        if not shift_name:
+                            shift_name = frappe.db.get_value(
+                                "Employee Checkin",
+                                {
+                                    "employee": employee,
+                                    "time": ("between", [
+                                        get_datetime(add_days(adate, -1)),
+                                        get_datetime(add_days(adate, 2))
+                                    ]),
+                                    "offshift": 0
+                                },
+                                "shift",
+                                order_by="time asc"
+                            )
+                        if not shift_name:
+                            logger.error(
+                                f"[CRITICAL] No shift found for {employee} {adate}, skipping delete"
+                            )
+                            continue  # 🚨 NEVER delete if rebuild not possible
+                        shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
+                        # ---------------------------------------------------
+                        # FLEX SHIFT →  DELETE
+                        # ---------------------------------------------------
+                        if cint(getattr(shift_doc, "custom_flexible_shift", 0)):
+                            logger.debug(
+                                f"[FLEX DELETE] Rebuilding & deleting attendance for {attendance.name} {employee} {adate}"
+                            )
+                            try:
+                                att_doc = frappe.get_doc("Attendance", attendance.name)
+                                # cancel if submitted
+                                if att_doc.docstatus == 1:
+                                    att_doc.cancel()
+                                frappe.delete_doc("Attendance", att_doc.name, force=1)
+                            except Exception:
+                                logger.exception(f"[FLEX DELETE FAILED] {attendance.name}")
+                            # unlink checkins so HRMS reprocesses
+                            _unlink_day_checkins(employee, adate)
+                            # ensure rebuild
+                            shifts_to_rebuild.add(shift_name)
+                            continue
+                        # ---------------------------------------------------
+                        # NON-FLEX → CONTROLLED DELETE
+                        # ---------------------------------------------------
+                        # 🔒 Safety: avoid deleting freshly rebuilt attendance
+                        att_doc = frappe.get_doc("Attendance", attendance.name)
+                        if (now_datetime() - att_doc.modified).total_seconds() < 5:
+                            logger.debug(
+                                f"[SKIP DELETE] Recently modified {att_doc.name}, avoiding race"
+                            )
+                            _unlink_day_checkins(employee, adate)
+                            shifts_to_rebuild.add(shift_name)
+                            continue
+                        # ✅ Safe delete
+                        if att_doc.docstatus == 1:
+                            att_doc.cancel()
+                            frappe.delete_doc("Attendance", att_doc.name, force=1)
+                            logger.debug(
+                                f"[NON-FLEX DELETE] {attendance.name} {employee} {adate}"
+                            )
+                        shifts_to_rebuild.add(shift_name)
                 # ---------------------------------------------------
                 # Unlink checkins so HRMS recomputes
                 # ---------------------------------------------------
-                _unlink_day_checkins(employee, adate)
-                if attendance.shift:
-                    shifts_to_rebuild.add(attendance.shift)
+                if not unlinked:
+                    _unlink_day_checkins(employee, adate)
+                # if attendance.shift:
+                #     shifts_to_rebuild.add(attendance.shift)
             # -----------------------------------------------------
-            # Rebuild attendance once per shift
+            # Rebuild attendance once per shift (STRICT isolation)
             # -----------------------------------------------------
+            current_shift = self.name
+            if self.name == "Flexy":
+                logger.debug(f"Shifts to rebuild after processing buckets: {shifts_to_rebuild}")
             for shift_name in shifts_to_rebuild:
-                # logger.debug(
-                #     f"[repair] rebuilding attendance for shift {shift_name}"
-                # )
+                # 🚨 HARD GUARD — prevent cross-shift rebuild
+                if shift_name != current_shift:
+                    continue
+                # if current_shift == "GENERAL9_30_to_6_00":
+                #     logger.debug(
+                #         f"[repair 2] rebuilding attendance ONLY for current shift {shift_name}"
+                #     )
                 shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
-                shift_doc.process_auto_attendance()
-        finally:
-            # -------------------------------------------------------
-            # Update repair timestamp safely
-            # -------------------------------------------------------
-            frappe.db.set_value(
-                "VCM HR Settings",
-                "VCM HR Settings",
-                "last_repair_run_at",
-                repair_start,
-            )
+                # Optional safety flag to control hooks
+                # checked in apply_nonflex_strict_hours to ensure it only runs during auto attendance, so we set it here during our repair run.
+                frappe.flags.in_auto_attendance_run = True
+                try:
+                    shift_doc.process_auto_attendance()
+                    self.run_post_attendance_rules(buckets)
+                finally:
+                    frappe.flags.in_auto_attendance_run = False
+        finally:                     
             frappe.db.commit()
             #  release lock
-            frappe.flags.vcm_repair_running = False      
+            frappe.flags.vcm_repair_running = False   
 
+
+
+    def run_post_attendance_rules(self, buckets):
+        employees = list({e for e, _ in buckets})
+        dates = list({d for _, d in buckets})
+        attendance_list = frappe.get_all(
+            "Attendance",
+            filters={
+                "employee": ("in", employees),
+                "attendance_date": ("in", dates),
+                "docstatus": 1
+            },
+            pluck="name"
+        )
+        for name in attendance_list:
+            doc = frappe.get_doc("Attendance", name)
+            # ✅ run ALL business rules here
+            apply_nonflex_strict_hours(doc)
+            
+
+            # persist WITHOUT triggering full lifecycle
+            doc.db_update()
     
     # Override has_incorrect_shift_config() to allow running
     # Keep the safety checks, but don’t block just because last_sync_of_checkin is empty./
@@ -587,67 +802,104 @@ def _shift_scan_window(shift, attendance_date):
 #     )
 #     return True
 
-
 @frappe.whitelist()
-def run_auto_attendance_now(employee: str | None = None):    
+def run_auto_attendance_now(employee: str | None = None):
     """
     Manual trigger for testers.
-    - Uses HRMS entrypoint when employee is not provided (upgrade-safe).
-    - When employee is provided, processes only shifts that employee belongs to (faster for testing).
+    Fixes:
+    - Shared repair_start across all shifts
+    - last_repair_run_at updated ONLY once after all shifts
+    - Prevents shift-wise data loss due to watermark overwrite
     """
-    # roles = set(frappe.get_roles(frappe.session.user))
-    # if "System Manager" not in roles and "HR Manager" not in roles:
-    #     frappe.throw(("Not permitted."))
-    details = {"started_at": str(now_datetime())}
-    # import traceback
-
-    # logger.debug(
-    #     "run_auto_attendance_now called\n%s",
-    #     "".join(traceback.format_stack())
-    # )
-    # logger.debug(f"Manual trigger for auto attendance by user {frappe.session.user} for employee {employee}")
-    # logging.debug(f"[run_auto_attendance_now] Manual trigger details: {details}")
+    repair_start = now_datetime()   # ✅ single snapshot for entire run
+    details = {"started_at": str(repair_start)}
     processed = 0
     errors = 0
-    if employee:
-        # Restrict work for testing: only process shifts where employee has an active Shift Assignment
-        shift_names = frappe.get_all(
-            "Shift Assignment",
-            filters={"employee": employee, "docstatus": 1, "status": "Active"},
-            pluck="shift_type",
-        )        
-        for s in set(shift_names):
-            try:
-                doc = frappe.get_cached_doc("Shift Type", s)
-                doc.process_auto_attendance(is_manually_triggered=True)
-                processed += 1
-            except Exception:
-                errors += 1
-                frappe.log_error(title=f"Auto attendance failed shift={s}", message=frappe.get_traceback())
-        details.update({
-            "mode": "employee",
-            "employee": employee,
-            "shifts": list(set(shift_names)),
-        })
+    try:
+        if employee:
+            logger.debug(f"Running auto attendance for employee {employee} with repair_start {repair_start}")
+            # ---------------------------------------
+            # Employee-specific mode
+            # ---------------------------------------
+            shift_names = frappe.get_all(
+                "Shift Assignment",
+                filters={"employee": employee, "docstatus": 1, "status": "Active"},
+                pluck="shift_type",
+            )
+            for s in set(shift_names):
+                try:
+                    doc = frappe.get_cached_doc("Shift Type", s)
+
+                    # 🔥 IMPORTANT: pass shared repair_start
+                    doc.process_auto_attendance(is_manually_triggered=True)
+                    # OR if process_auto_attendance internally calls it:
+                    # doc.process_auto_attendance(is_manually_triggered=True, repair_start=repair_start)
+                    processed += 1
+                except Exception:
+                    errors += 1
+                    frappe.log_error(
+                        title=f"Auto attendance failed shift={s}",
+                        message=frappe.get_traceback(),
+                    )
+            details.update({
+                "mode": "employee",
+                "employee": employee,
+                "shifts": list(set(shift_names)),
+            })
+        else:
+            # ---------------------------------------
+            # All shifts mode (CUSTOM, NOT HRMS default)
+            # ---------------------------------------
+            shifts = frappe.get_all(
+                "Shift Type",
+                filters={"enable_auto_attendance": 1},
+                pluck="name",
+            )
+            # logger.debug(f"Running auto attendance for all shifts {shifts} with repair_start {repair_start}")
+            for s in shifts:
+                try:
+                    doc = frappe.get_cached_doc("Shift Type", s)
+                    # 🔥 IMPORTANT: pass same repair_start to all shifts
+                    # doc.reconcile_late_checkins(repair_start=repair_start)
+                    doc.process_auto_attendance(is_manually_triggered=True)
+                    processed += 1
+                except Exception:
+                    errors += 1
+                    frappe.log_error(
+                        title=f"Auto attendance failed shift={s}",
+                        message=frappe.get_traceback(),
+                    )
+            details.update({
+                "mode": "all_shifts",
+                "total_shifts": len(shifts),
+            })
+        # ---------------------------------------
+        # ✅ UPDATE WATERMARK ONCE (CRITICAL FIX)
+        # ---------------------------------------
+        # logger.debug(f"Updating last_repair_run_at to {repair_start} after processing {processed} shifts with {errors} errors")
+        frappe.db.set_value(
+            "VCM HR Settings",
+            "VCM HR Settings",
+            "last_repair_run_at",
+            repair_start,
+        )
+        frappe.db.commit()
         return {
-            "ok": True,
+            "ok": errors == 0,
             "processed": processed,
             "errors": errors,
             "details": details,
         }
-    # Default: process all shifts (HRMS standard)
-    from hrms.hr.doctype.shift_type.shift_type import process_auto_attendance_for_all_shifts
-    # logger.debug("Running auto attendance for all shifts (manual trigger)")
-    process_auto_attendance_for_all_shifts()
-    processed = frappe.db.count(
-        "Shift Type",
-        {"enable_auto_attendance": 1}
-    )
-    details.update({"mode": "all_shifts"})
-    return {
-        "ok": errors == 0,
-        "processed": processed,
-        "errors": errors,
-        "details": details,
-    }
+    finally:
+        # safety unlock (if you use global flag)
+        frappe.flags.vcm_repair_running = False
 
+def date_range(start_date, end_date):
+        start = getdate(start_date)
+        end = getdate(end_date)
+        days = []
+        d = start
+        while d <= end:
+            days.append(d)
+            d = add_days(d, 1)
+        return days

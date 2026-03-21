@@ -158,15 +158,22 @@ doc_events = {
     },
     "Attendance": {
         "validate": [
-            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",
+            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_flex_min_hours", # order matters here - flex hours must be applied before strict hours
+            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",            
             "vcmhrms.vcm_hrms.overrides.attendance_hooks.enforce_late_entry_policy",
-        ],        
+        ],
+        "on_update_after_submit": [
+            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_flex_min_hours",
+            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",            
+            "vcmhrms.vcm_hrms.overrides.attendance_hooks.enforce_late_entry_policy",
+        ],
     },
     "Payroll Entry": {
         "on_submit": "vcmhrms.vcm_hrms.overrides.attendance_hooks.lock_attendance_after_payroll"
     },
     "Leave Application": {
-        "before_submit": "vcmhrms.vcm_hrms.overrides.leavefix.fix_existing_attendance"
+        "before_submit": "vcmhrms.vcm_hrms.overrides.leavefix.fix_existing_attendance",
+        "validate": "vcmhrms.vcm_hrms.overrides.leavefix.validate_locked_attendance"
     },
     
 }

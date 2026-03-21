@@ -168,61 +168,67 @@ def _run_sandwich_for_employee(employee, from_date, to_date, hol_dates):
     # logging.debug(f"_run_sandwich_for_employee {employee} from {from_date} to {to_date} with holidays on {hol_dates}")   
     created = 0
     cleared = 0
+    from_date = getdate(from_date)
+    to_date = getdate(to_date)
+    # ---------------------------------------------------
+    # 🔥 Prefetch ALL attendance in one go
+    # ---------------------------------------------------
+    attendance_rows = frappe.get_all(
+        "Attendance",
+        filters={
+            "employee": employee,
+            "attendance_date": ("between", [add_days(from_date, -2), add_days(to_date, 2)]),
+            "docstatus": ("<", 2),
+        },
+        fields=["attendance_date", "status"],
+        limit_page_length=5000,
+    )
+    # Build map: date → status
+    attendance_map = {
+        getdate(r.attendance_date): r.status for r in attendance_rows
+    }
+    def get_status(d):
+        return attendance_map.get(d, "Absent")
+    # ---------------------------------------------------
+    # Iterate once
+    # ---------------------------------------------------
     d = from_date
-
     while d <= to_date:
         if d not in hol_dates:
             d = add_days(d, 1)
             continue
+        # ---------------------------------------------------
+        # Build contiguous holiday block
+        # ---------------------------------------------------
         block_start = d
         block_end = d
-        # build holiday block
         while add_days(block_end, 1) in hol_dates:
             block_end = add_days(block_end, 1)
         prev_day = add_days(block_start, -1)
         next_day = add_days(block_end, 1)
-        prev_status = _get_attendance_status(employee, prev_day)
-        next_status = _get_attendance_status(employee, next_day)
-        # leave breaks sandwich
-        if _has_leave(employee, prev_day) or _has_leave(employee, next_day):
-            d = add_days(block_end, 1)
-            continue
-        # sandwich condition
+        prev_status = get_status(prev_day)
+        next_status = get_status(next_day)
+        logger.debug(
+            f"[SANDWICH] {employee} block {block_start}->{block_end} "
+            f"prev={prev_status} next={next_status}"
+        )
+        # ---------------------------------------------------
+        # 🎯 CORE RULE
+        # ---------------------------------------------------
         if prev_status == "Absent" and next_status == "Absent":
+            # CREATE sandwich for full block
             x = block_start
             while x <= block_end:
                 created += _apply_sandwich_day(employee, x)
                 x = add_days(x, 1)
         else:
+            # CLEAR sandwich for full block
             cleared += _clear_sandwich_block(employee, block_start, block_end)
         d = add_days(block_end, 1)
     return {"created": created, "cleared": cleared}
 
-def _has_leave(employee, date):
+     
 
-    return frappe.db.exists(
-        "Leave Application",
-        {
-            "employee": employee,
-            "from_date": ("<=", date),
-            "to_date": (">=", date),
-            "docstatus": 1
-        }
-    )       
-# ------------------------------------------------------------
-# Working day helpers
-# ------------------------------------------------------------
-def _prev_working_day(date, holidays):
-    d = add_days(date, -1)
-    while d in holidays:
-        d = add_days(d, -1)
-    return d
-
-def _next_working_day(date, holidays):
-    d = add_days(date, 1)
-    while d in holidays:
-        d = add_days(d, 1)
-    return d
 # ------------------------------------------------------------
 # Apply sandwich leave
 # ------------------------------------------------------------
@@ -251,6 +257,10 @@ def _apply_sandwich_day(employee, date):
     )
     # logger.debug(f"_apply_sandwich_day: Attendance for {employee} on {date}: {att}")
     if att:
+        if att.status != "Absent":
+            # Attendance exists but is Absent
+            # Attendance exists but no work done
+            return 0
         first_half = int(att.get("custom_first_half_done") or 0)
         second_half = int(att.get("custom_second_half_done") or 0)
         # If any half done → employee worked enough
@@ -310,7 +320,12 @@ def _apply_sandwich_day(employee, date):
 # ------------------------------------------------------------
 def _clear_sandwich_block(employee, start, end):
     cleared = 0
-    # logger.debug(f"Clearing sandwich block for {employee} from {start} to {end}")
+    prev_day = add_days(start, -1)
+    next_day = add_days(end, 1)
+    prev_status = _get_attendance_status(employee, prev_day)
+    next_status = _get_attendance_status(employee, next_day)
+    # logger.debug(f"Clearing sandwich block for {employee} from {start} to {end}")    
+    # ❌ Otherwise clear ALL sandwich leaves in block
     leaves = frappe.get_all(
         "Leave Application",
         filters={
@@ -320,32 +335,20 @@ def _clear_sandwich_block(employee, start, end):
             "to_date": (">=", start),
             "docstatus": 1,
         },
-        fields=["name", "from_date", "to_date"],
+        pluck="name",
     )
-    for row in leaves:
-        leave_start = getdate(row.from_date)
-        leave_end = getdate(row.to_date)
-        prev_day = add_days(leave_start, -1)
-        next_day = add_days(leave_end, 1)
-        prev_status = _get_attendance_status(employee, prev_day)
-        next_status = _get_attendance_status(employee, next_day)
-
-        # sandwich must exist ONLY when both sides are Absent
-        # when boundaries change you must ensure all sandwich leaves inside the block are removed, not just first.
-        if prev_status != "Absent" or next_status != "Absent":
-            leave_doc = frappe.get_doc("Leave Application", row.name)
-            leave_doc.cancel()
-            frappe.delete_doc(
-                "Leave Application",
-                leave_doc.name,
-                force=1
-            )
+    for name in leaves:
+        try:
+            doc = frappe.get_doc("Leave Application", name)
+            doc.cancel()
+            frappe.delete_doc("Leave Application", name, force=1)
             logger.info(
-                f"Sandwich leave cancelled for {employee} "
-                f"({leave_start} to {leave_end}) "
-                f"prev_status={prev_status} next_status={next_status}"
+                f"[sandwich cleared] {employee} {start}->{end} "
+                f"prev={prev_status} next={next_status}"
             )
             cleared += 1
+        except Exception:
+            logger.exception(f"[sandwich clear failed] {name}")
     return cleared
 
 
