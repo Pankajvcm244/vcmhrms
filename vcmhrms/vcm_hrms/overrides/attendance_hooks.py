@@ -534,11 +534,17 @@ def apply_nonflex_strict_hours(doc, method=None):
 
 
 def apply_flex_min_hours(doc, method=None):
-    logging.debug(f"[apply_flex_min_hours] Evaluating {doc.name} for flexible shift minimum hours enforcement")
+    # Correct Decision Matrix
+    # Scenario	Expected Result
+    # Full day leave + no punch	On Leave
+    # Full day leave + punch	On Leave (OT allowed but not changing status)
+    # Half day leave + no punch	Half Day + Absent
+    # Half day leave + punch	Half Day (worked half)
+    # No leave	Normal flex logic
+    logging.debug(f"[apply_flex_min_hours] Evaluating {doc.name}")
     # if not getattr(frappe.flags, "in_auto_attendance_run", False):
     #     logger.debug(f"[apply_flex_min_hours] Not in auto attendance run; skipping flexible hours enforcement for {doc.name}")
     #     return
-
     if not doc.shift:
         return
     if getattr(doc, "docstatus", 0) == 2:
@@ -550,49 +556,70 @@ def apply_flex_min_hours(doc, method=None):
     if not cint(getattr(shift, "custom_flexible_shift", 0)):
         logger.debug(f"[apply_flex_min_hours] Shift {shift.name} is not flexible; skipping flex hours enforcement for {doc.name}")
         return
+    # =====================================================
+    # 🚨 CRITICAL: HANDLE LEAVE FIRST
+    # =====================================================
+    is_leave = bool(doc.leave_application or doc.leave_type)
+    # -------------------------
+    # FULL DAY LEAVE
+    # -------------------------
+    if is_leave and (doc.status or "").strip().lower() == "on leave":
+        logging.debug(f"[FLEX SKIP] Full day leave → {doc.name}")
+        # 👉 Optional: compute OT but DO NOT change status
+        if doc.in_time and doc.out_time:
+            in_dt = get_datetime(doc.in_time)
+            out_dt = get_datetime(doc.out_time)
+            if in_dt and out_dt and out_dt > in_dt:
+                wh = flt((out_dt - in_dt).total_seconds() / 3600.0, 2)
+                doc.working_hours = wh  # for reporting only
+        return  # 🔥 DO NOT TOUCH STATUS
+    # -------------------------
+    # HALF DAY LEAVE
+    # -------------------------
+    if is_leave and (doc.status or "").strip().lower() == "half day":
+        logging.debug(f"[FLEX HALF LEAVE] {doc.name}")
+        # no punch → absent half
+        if not doc.in_time or not doc.out_time:
+            doc.working_hours = 0
+            doc.half_day_status = "Absent"
+            return
+        # punch exists → worked half
+        in_dt = get_datetime(doc.in_time)
+        out_dt = get_datetime(doc.out_time)
+        if not in_dt or not out_dt or out_dt <= in_dt:
+            return
+        wh = flt((out_dt - in_dt).total_seconds() / 3600.0, 2)
+        doc.working_hours = wh
+        doc.half_day_status = "Present"
+        return
+    # =====================================================
+    # NORMAL FLEX LOGIC (NO LEAVE)
+    # =====================================================
+    if not doc.in_time or not doc.out_time:
+        return
     in_dt = get_datetime(doc.in_time)
     out_dt = get_datetime(doc.out_time)
     if not in_dt or not out_dt or out_dt <= in_dt:
         return
-    # ----------------------------
-    # PURE DURATION
-    # ----------------------------
     wh = flt((out_dt - in_dt).total_seconds() / 3600.0, 2)
     doc.working_hours = wh
     absent_thr = float(getattr(shift, "working_hours_threshold_for_absent", 0) or 0)
     half_day_thr = float(getattr(shift, "working_hours_threshold_for_half_day", 0) or 0)
-    logger.debug(
-        f"[FLEX] Evaluating {doc.name} with working_hours={wh} against absent_thr={absent_thr} half_day_thr={half_day_thr}" 
+    logging.debug(
+        f"[FLEX] {doc.name} wh={wh} absent_thr={absent_thr} half_day_thr={half_day_thr}"
     )
-    # ----------------------------
-    # STATUS DECISION
-    # ----------------------------
     if wh < absent_thr:
         new_status = "Absent"
     elif wh < half_day_thr:
         new_status = "Half Day"
-
     else:
         new_status = "Present"
-    # DO NOT override full leave
-    if (doc.status or "").strip().lower() == "on leave":
-        return
-    # ----------------------------
-    # APPLY
-    # ----------------------------
+
     if doc.status != new_status:
         doc.status = new_status
-    # ----------------------------
-    # HALF DAY STATUS
-    # ----------------------------
     if hasattr(doc, "half_day_status"):
         if new_status == "Half Day":
-            # 🔥 Check if leave exists
-            has_leave = bool(doc.leave_application or doc.leave_type)
-            if has_leave:
-                doc.half_day_status = "Present"
-            else:
-                doc.half_day_status = "Absent"
+            doc.half_day_status = "Present"
         else:
             doc.half_day_status = None
     logger.debug(
