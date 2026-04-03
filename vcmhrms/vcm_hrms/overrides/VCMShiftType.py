@@ -249,7 +249,7 @@ class VCMShiftType(HRMSShiftType):
                     buckets.add((l.employee, d, self.name))                 
             if not buckets:
                 return
-            logger.debug(f"Processing {len(buckets)} impacted employee-day-shift buckets for shift {self.name}: {buckets}")
+            # logger.debug(f"reco_late_checkin Processing {len(buckets)} impacted employee-day-shift buckets for shift {self.name}: {buckets}")
             # =========================================================
             # 4. PROCESS BUCKETS
             # =========================================================
@@ -303,15 +303,14 @@ class VCMShiftType(HRMSShiftType):
                     logger.debug(f"[LEAVE RECOMPUTE] {att_doc.name}")
                     try:                        
                         # 🔥 STEP 1: recompute IN/OUT from checkins
+                        shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
+                        start, end = _shift_scan_window(shift_doc, adate)
                         checkins = frappe.get_all(
                             "Employee Checkin",
                             filters={
                                 "employee": employee,
                                 "shift": shift_name,
-                                "time": ("between", [
-                                    get_datetime(adate),
-                                    get_datetime(add_days(adate, 1))
-                                ]),
+                                "time": ("between", [start, end]),
                                 "offshift": 0,
                             },
                             fields=["time"],
@@ -332,8 +331,19 @@ class VCMShiftType(HRMSShiftType):
                                 att_doc.in_time = checkins[0].time
                                 att_doc.out_time = checkins[-1].time
 
-                                apply_flex_min_hours(att_doc)
-
+                                shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
+                                if cint(getattr(shift_doc, "custom_flexible_shift", 0)):
+                                    apply_flex_min_hours(att_doc)
+                                else:
+                                    apply_nonflex_strict_hours(att_doc)
+                                #  link checkin to attendence 
+                                _link_day_checkins(
+                                    employee,
+                                    shift_name,
+                                    start,
+                                    end,
+                                    att_doc.name
+                                )
                                 frappe.db.set_value(
                                     "Attendance",
                                     att_doc.name,
@@ -362,9 +372,9 @@ class VCMShiftType(HRMSShiftType):
                         # -------------------------------------------------
                         # HALF DAY LEAVE
                         # -------------------------------------------------
-                        elif status == "Half Day":
-                            logger.debug(f"[LEAVE HALF NO PUNCH] {attendance.name}")
-                            if not checkins:                                
+                        elif status == "Half Day":                            
+                            if not checkins:  
+                                # logger.debug(f"[LEAVE HALF NO PUNCH] {attendance.name}")                              
                                 frappe.db.set_value(
                                     "Attendance",
                                     attendance.name,
@@ -377,11 +387,23 @@ class VCMShiftType(HRMSShiftType):
                                         "modified": now_datetime(),
                                     }
                                 )
-                            else:
+                            else:                                
                                 logger.debug(f"[LEAVE HALF WITH PUNCH] {attendance.name}")
                                 att_doc.in_time = checkins[0].time
                                 att_doc.out_time = checkins[-1].time
-                                apply_flex_min_hours(att_doc)
+                                shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
+                                if cint(getattr(shift_doc, "custom_flexible_shift", 0)):
+                                    apply_flex_min_hours(att_doc)
+                                else:
+                                    apply_nonflex_strict_hours(att_doc)
+                                #  link checkin to attendence 
+                                _link_day_checkins(
+                                    employee,
+                                    shift_name,
+                                    start,
+                                    end,
+                                    att_doc.name
+                                )
                                 frappe.db.set_value(
                                     "Attendance",
                                     att_doc.name,
@@ -390,7 +412,7 @@ class VCMShiftType(HRMSShiftType):
                                         "out_time": att_doc.out_time,
                                         "working_hours": att_doc.working_hours,
                                         "status": "Half Day",  # 🔥 FORCE
-                                        "half_day_status": "Present",
+                                        "half_day_status": att_doc.half_day_status,
                                         "modified": now_datetime(),
                                     }
                                 ) 
@@ -522,6 +544,30 @@ def _unlink_day_checkins(employee: str, attendance_date):
             AND `time` >= %s AND `time` < %s
             """,
             (employee, day_start, day_end),
+        )
+
+def _link_day_checkins(employee, shift_name, start, end, attendance_name):
+    """
+    Link all valid checkins in a shift window to the given Attendance.
+    """
+    checkins = frappe.get_all(
+        "Employee Checkin",
+        filters={
+            "employee": employee,
+            "shift": shift_name,
+            "time": ("between", [start, end]),
+            "offshift": 0,
+        },
+        fields=["name"],
+        order_by="time asc",
+    )
+    for c in checkins:
+        frappe.db.set_value(
+            "Employee Checkin",
+            c.name,
+            "attendance",
+            attendance_name,
+            update_modified=False,
         )
 
 def _attendance_date_for_punch(shift, punch_dt):
@@ -761,6 +807,7 @@ def run_auto_attendance_now(employee: str | None = None):
     details = {"started_at": str(repair_start)}
     processed = 0
     errors = 0
+    # logger.debug(f"In run_auto_attendance_now ")
     try:
         if employee:
             logger.debug(f"Running auto attendance for employee {employee} with repair_start {repair_start}")
@@ -801,7 +848,7 @@ def run_auto_attendance_now(employee: str | None = None):
                 filters={"enable_auto_attendance": 1},
                 pluck="name",
             )
-            # logger.debug(f"Running auto attendance for all shifts {shifts} with repair_start {repair_start}")
+            # logger.debug(f"Running auto attendance for all shifts {shifts} with current time as repair_start {repair_start}")
             for s in shifts:
                 try:
                     doc = frappe.get_cached_doc("Shift Type", s)
