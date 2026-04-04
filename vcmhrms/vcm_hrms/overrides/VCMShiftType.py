@@ -174,8 +174,8 @@ class VCMShiftType(HRMSShiftType):
             # logger.debug(f" Adjusted repair_floor based on lock: {repair_floor}")
          # incremental window
         from_dt = get_datetime(last_run) if last_run else add_days(repair_start, -1)
-        # if self.name == "GENERAL9_30_to_6_00":
-        #     logger.debug(f"reconcile_late_checkins 1 checkins {from_dt} (repair {repair_floor}) shift {self.name}") 
+        if self.name == "GENERAL9_30_to_6_00":
+            logger.debug(f"reconcile_late_checkins 1 checkins {from_dt} (repair {repair_floor}) shift {self.name}") 
         # Prevent parallel repair runs           # 
         shifts_to_rebuild = set()     
         try:
@@ -194,8 +194,8 @@ class VCMShiftType(HRMSShiftType):
                 order_by="employee, time asc",
                 limit_page_length=5000,
             )
-            if self.name == "Flexy":
-                logger.debug(f"reconcile_late_checkins checkins {(checkins)} , to reconcile for shift {self.name}")    
+            # if self.name == "Flexy":
+            #     logger.debug(f"reconcile_late_checkins checkins {(checkins)} , to reconcile for shift {self.name}")    
             
             # -------------------------------------------------------
             # BUILD BUCKETS (STRICT: employee, date, shift)
@@ -224,8 +224,8 @@ class VCMShiftType(HRMSShiftType):
                 },
                 fields=["employee", "from_date", "to_date", "half_day", "half_day_date"]
             )
-            if self.name == "Flexy":
-                logger.debug(f" reconcile_late_checkins 1-1 leave_updates {leave_updates} {from_dt} shift {self.name}") 
+            # if self.name == "Flexy":
+            #     logger.debug(f" reconcile_late_checkins 1-1 leave_updates {leave_updates} {from_dt} shift {self.name}") 
             for l in leave_updates:
                 dates = [l.half_day_date] if l.half_day and l.half_day_date else date_range(l.from_date, l.to_date) 
                 for d in dates:
@@ -248,8 +248,9 @@ class VCMShiftType(HRMSShiftType):
                         continue  
                     buckets.add((l.employee, d, self.name))                 
             if not buckets:
+                logger.debug(f"no bucket returning")
                 return
-            # logger.debug(f"reco_late_checkin Processing {len(buckets)} impacted employee-day-shift buckets for shift {self.name}: {buckets}")
+            logger.debug(f"reco_late_checkin Processing {len(buckets)} impacted employee-day-shift buckets for shift {self.name}: {buckets}")
             # =========================================================
             # 4. PROCESS BUCKETS
             # =========================================================
@@ -353,6 +354,10 @@ class VCMShiftType(HRMSShiftType):
                                         "working_hours": att_doc.working_hours,
                                         "status": "On Leave",  # 🔥 FORCE BACK
                                         "half_day_status": None,
+                                        "half_day_status": att_doc.half_day_status,
+                                        "custom_late_entry_within_grace": att_doc.custom_late_entry_within_grace,
+                                        "custom_first_half_done": att_doc.custom_first_half_done,
+                                        "custom_second_half_done":att_doc.custom_second_half_done,
                                         "modified": now_datetime(),
                                     }
                                 )
@@ -366,6 +371,10 @@ class VCMShiftType(HRMSShiftType):
                                         "working_hours": 0,
                                         "in_time": None,
                                         "out_time": None,
+                                        "half_day_status": att_doc.half_day_status,
+                                        "custom_late_entry_within_grace": att_doc.custom_late_entry_within_grace,
+                                        "custom_first_half_done": att_doc.custom_first_half_done,
+                                        "custom_second_half_done":att_doc.custom_second_half_done,
                                         "modified": now_datetime(),
                                     }
                                 )
@@ -384,6 +393,10 @@ class VCMShiftType(HRMSShiftType):
                                         "working_hours": 0,
                                         "in_time": None,
                                         "out_time": None,
+                                        "half_day_status": att_doc.half_day_status,
+                                        "custom_late_entry_within_grace": att_doc.custom_late_entry_within_grace,
+                                        "custom_first_half_done": att_doc.custom_first_half_done,
+                                        "custom_second_half_done":att_doc.custom_second_half_done,
                                         "modified": now_datetime(),
                                     }
                                 )
@@ -413,6 +426,9 @@ class VCMShiftType(HRMSShiftType):
                                         "working_hours": att_doc.working_hours,
                                         "status": "Half Day",  # 🔥 FORCE
                                         "half_day_status": att_doc.half_day_status,
+                                        "custom_late_entry_within_grace": att_doc.custom_late_entry_within_grace,
+                                        "custom_first_half_done": att_doc.custom_first_half_done,
+                                        "custom_second_half_done":att_doc.custom_second_half_done,
                                         "modified": now_datetime(),
                                     }
                                 ) 
