@@ -606,10 +606,7 @@ def reconcile_late_grace_quota_global():
         # -----------------------------------
         # STEP 4: GLOBAL SORT
         # -----------------------------------
-        eligible.sort(key=lambda x: (
-            x["current_flag"],
-            x["attendance_date"]
-        ))
+        eligible.sort(key=lambda x: (x["attendance_date"], x["name"]))
         # -----------------------------------
         # STEP 5: APPLY QUOTA
         # -----------------------------------

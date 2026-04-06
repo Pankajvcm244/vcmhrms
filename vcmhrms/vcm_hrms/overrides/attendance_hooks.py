@@ -298,7 +298,7 @@ def apply_nonflex_strict_hours(doc, method=None):
     if cint(getattr(shift, "custom_flexible_shift", 0) or 0):
         # logger.debug(f"[apply_nonflex_strict_hours 2] Shift {shift.name} is flexible; skipping strict hours enforcement for {doc.name}")
         return
-    # logger.debug(f"[apply_nonflex_strict_hours 3] Shift {shift.name} is non-flex; applying strict hours enforcement for {doc.name}")
+    logger.debug(f"[apply_nonflex_strict_hours 3] Shift {shift.name} is non-flex; applying strict hours enforcement for {doc.name}")
     # Skip leave-driven attendance
     status_lc = (getattr(doc, "status", "") or "").strip().lower()
     #  On leave status if for full day leave, for half day it is "Half Day"
@@ -313,7 +313,7 @@ def apply_nonflex_strict_hours(doc, method=None):
         if not (getattr(doc, "in_time", None) and getattr(doc, "out_time", None)):
             logger.debug(f"[apply_nonflex_strict_hours 1.1.1.3] return ")
             return
-    # logger.debug(f"[apply_nonflex_strict_hours 1.1] Evaluating {doc.name} for non-flex strict hours enforcement") 
+    logger.debug(f"[apply_nonflex_strict_hours 1.1] Evaluating {doc.name} for non-flex strict hours enforcement") 
     in_dt = get_datetime(doc.in_time)
     out_dt = get_datetime(doc.out_time)
     if not in_dt or not out_dt or out_dt <= in_dt:
@@ -325,9 +325,9 @@ def apply_nonflex_strict_hours(doc, method=None):
         in_dt=in_dt,
         out_dt=out_dt,
     )
-    # logger.debug(
-    #     f"[apply_nonflex_strict_hours 2] For in_dt={in_dt} out_dt={out_dt} strict_start={strict_start} strict_end={strict_end} lunch_start={lunch_start} lunch_end={lunch_end}"
-    # )
+    logger.debug(
+        f"[apply_nonflex_strict_hours 2] For in_dt={in_dt} out_dt={out_dt} strict_start={strict_start} strict_end={strict_end} lunch_start={lunch_start} lunch_end={lunch_end}"
+    )
     if not strict_start or not strict_end:
         logger.debug(f"[apply_nonflex_strict_hours 1.1.1.4] return {strict_start}, {strict_end}")
         return
@@ -439,7 +439,7 @@ def apply_nonflex_strict_hours(doc, method=None):
     if allow_relaxation:
         required_first_half_hours = max(0, required_first_half_hours - late_grace / 60)
     first_half_done = 1 if first_half_hours >= required_first_half_hours else 0
-    # logger.debug(f"[apply_nonflex_strict_hours 5]  wh={wh} first_half_hours={first_half_hours} required_first_half_hours={required_first_half_hours} first_half_done={first_half_done}")
+    logger.debug(f"[apply_nonflex_strict_hours 5]  wh={wh} first_half_hours={first_half_hours} required_first_half_hours={required_first_half_hours} first_half_done={first_half_done}")
 
     # Second half considered "completed" only if employee was present at/after lunch_end AND stayed till strict_end.
     # This enforces your "second half has no quota and must complete full 4 hours".
@@ -450,7 +450,7 @@ def apply_nonflex_strict_hours(doc, method=None):
         second_half_hours = max(0, (eff_out - sh_start).total_seconds()) / 3600
     required_second_half_hours = (strict_end - lunch_end).total_seconds() / 3600
     second_half_done = 1 if second_half_hours >= required_second_half_hours else 0
-    # logger.debug(f"[apply_nonflex_strict_hours 6]  wh={wh} second_half_hours={second_half_hours} required_second_half_hours={required_second_half_hours} second_half_done={second_half_done}")
+    logger.debug(f"[apply_nonflex_strict_hours 6]  wh={wh} second_half_hours={second_half_hours} required_second_half_hours={required_second_half_hours} second_half_done={second_half_done}")
     # ----------------------------
     # Persist Half Completion Flags
     # ----------------------------
@@ -480,7 +480,7 @@ def apply_nonflex_strict_hours(doc, method=None):
     if (doc.status or "").strip().lower() == "on leave":
         # Skip only full leave, half day leave may have punch also and we
         #  need to process that attendance and mark half day status as present in that case
-        # logger.debug(f"[apply_nonflex_strict_hours 7.1] Attendance {doc.name} is marked as 'On Leave'. Skipping status override but will evaluate half-day status if applicable.")
+        logger.debug(f"[apply_nonflex_strict_hours 7.1] Attendance {doc.name} is marked as 'On Leave'. Skipping status override but will evaluate half-day status if applicable.")
         return
     absent_thr = getattr(shift, "working_hours_threshold_for_absent", None)
     half_day_thr = getattr(shift, "working_hours_threshold_for_half_day", None)
@@ -518,7 +518,7 @@ def apply_nonflex_strict_hours(doc, method=None):
         # logger.debug(f"[apply_nonflex_strict_hours 11.1] Evaluating half_day_status for {doc.name} with new_status={new_status}")
         if new_status != "Half Day":
             #  if full present or full day leave we don't need half day status, so clearing that field to avoid confusion
-            # logger.debug(f"[apply_nonflex_strict_hours 11.1.1] {doc.name} is not Half Day. Clearing half_day_status.") 
+            logger.debug(f"[apply_nonflex_strict_hours 11.1.1] {doc.name} is not Half Day. Clearing half_day_status.") 
             doc.half_day_status = None
         else:
             # half day leave + punch case
@@ -538,12 +538,12 @@ def apply_nonflex_strict_hours(doc, method=None):
                     #     f"[HALF DAY FINAL] {doc.name} status={doc.status} half_day_status={doc.half_day_status}"
                     # )
                 else:
-                    # logger.debug(f"[apply_nonflex_strict_hours 12-1] No valid punch (doc.in_time={doc.in_time}, doc.out_time={doc.out_time}) Marking half_day_status as Absent for {doc.name} despite half-day leave application")
+                    logger.debug(f"[apply_nonflex_strict_hours 12-1] No valid punch (doc.in_time={doc.in_time}, doc.out_time={doc.out_time}) Marking half_day_status as Absent for {doc.name} despite half-day leave application")
                     # 🚨 DO NOT downgrade if already Present (multi-run safe)
                     # if doc.half_day_status != "Present":
                     doc.half_day_status = "Absent"
             else:
-                # logger.debug(f"[apply_nonflex_strict_hours 12-1-1] Marking half_day_status as Absent for {doc.name} due to no half-day leave application")
+                logger.debug(f"[apply_nonflex_strict_hours 12-1-1] Marking half_day_status as Absent for {doc.name} due to no half-day leave application")
                 doc.half_day_status = "Absent"  
     # else:
     #     logger.debug(f"[apply_nonflex_strict_hours 11] No status change for {doc.name}. Status remains {doc.status} with wh={wh} first_half_done={first_half_done} second_half_done={second_half_done} early_exit={getattr(doc,'early_exit',None)}")
