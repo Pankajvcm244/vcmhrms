@@ -270,9 +270,9 @@ def _apply_sandwich_day(employee, date):
             #     f"(first_half_done={first_half}, second_half_done={second_half})"
             # )
             return 0
-        # If attendance exists but not enough work → still skip creating leave
-        # because attendance engine should decide status
-        return 0
+        # If attendance exists but not enough work 
+        # Lets create sandwich if none of half is done
+        # return 0
     # ------------------------------------------------------------
     # Skip if leave already exists
     # ------------------------------------------------------------
