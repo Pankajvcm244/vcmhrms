@@ -81,6 +81,13 @@ frappe.ui.form.on("VCM HR Settings", {
                 }
             );
         });
+        frm.add_custom_button('Recalculate Late Grace Quota', () => {
+            frappe.call({
+                method: 'vcmhrms.vcm_hrms.overrides.VCMShiftType.run_late_grace_quota_manual',
+                freeze: true,
+                freeze_message: 'Recalculating Late Grace...'
+            });
+        });
         // -----------------------------
         // SANDWICH LEAVE BUTTON
         // -----------------------------
