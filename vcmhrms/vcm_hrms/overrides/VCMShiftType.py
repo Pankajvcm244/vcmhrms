@@ -394,7 +394,7 @@ class VCMShiftType(HRMSShiftType):
                                         "working_hours": 0,
                                         "in_time": None,
                                         "out_time": None,
-                                        "half_day_status": att_doc.half_day_status,
+                                        "half_day_status": "Absent",
                                         "custom_late_entry_within_grace": att_doc.custom_late_entry_within_grace,
                                         "custom_first_half_done": att_doc.custom_first_half_done,
                                         "custom_second_half_done":att_doc.custom_second_half_done,
@@ -603,22 +603,30 @@ def run_late_grace_quota_manual():
         # -----------------------------------
         eligible.sort(key=lambda x: (x["attendance_date"], x["name"]))
         # -----------------------------------
-        # STEP 5: APPLY QUOTA
+        # STEP 5: APPLY QUOTA (FULL SYNC)
         # -----------------------------------
+
+        # determine which should be 1
+        allowed_names = set()
         for idx, row in enumerate(eligible):
-            new_flag = 1 if idx < allowed else 0
-            current_flag = cint(row["current_flag"])
-            if current_flag == new_flag:
+            if idx < allowed:
+                allowed_names.add(row["name"])
+
+        for r in records:
+            should_be_flag = 1 if r.name in allowed_names else 0
+            current_flag = cint(r.custom_late_entry_within_grace or 0)
+
+            if current_flag == should_be_flag:
                 continue
-            doc = frappe.get_doc("Attendance", row["name"])
-            # logger.debug(
-            #     f"[LATE GRACE CHANGE] {doc.name} {current_flag} → {new_flag}"
-            # )
-            # update flag
-            doc.custom_late_entry_within_grace = new_flag
-            # recompute attendance
+
+            doc = frappe.get_doc("Attendance", r.name)
+
+            # 🔥 update flag
+            doc.custom_late_entry_within_grace = should_be_flag
+
+            # 🔥 recompute attendance
             apply_nonflex_strict_hours(doc)
-            # persist
+
             frappe.db.set_value(
                 "Attendance",
                 doc.name,
@@ -629,7 +637,7 @@ def run_late_grace_quota_manual():
                     "late_entry": doc.late_entry,
                     "custom_first_half_done": doc.custom_first_half_done,
                     "custom_second_half_done": doc.custom_second_half_done,
-                    "half_day_status":doc.half_day_status,
+                    "half_day_status": doc.half_day_status,
                     "modified": now_datetime(),
                 }
             )
