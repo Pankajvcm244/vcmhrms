@@ -1,7 +1,7 @@
 # Copyright (c) 2026, Pankaj Sharma and contributors
 # For license information, please see license.txt
 import frappe
-from frappe.utils import getdate, nowdate, add_days, get_datetime
+from frappe.utils import getdate, nowdate, add_days, get_datetime, cint, flt
 import logging
 logger = logging.getLogger(__name__)
 SANDWICH_LEAVE_TYPE = "Sandwich Absent"
@@ -251,28 +251,49 @@ def _apply_sandwich_day(employee, date):
             "name",
             "custom_first_half_done",
             "custom_second_half_done",
-            "status"
+            "status",
+            "shift",
+            "working_hours"
         ],
         as_dict=True
     )
     # logger.debug(f"_apply_sandwich_day: Attendance for {employee} on {date}: {att}")
-    if att:
+    
+    if att:        
         if att.status != "Absent":
-            # Attendance exists but is Absent
-            # Attendance exists but no work done
+            # Attendance exists but is not Absent, like half day, On leave etc
             return 0
-        first_half = int(att.get("custom_first_half_done") or 0)
-        second_half = int(att.get("custom_second_half_done") or 0)
-        # If any half done → employee worked enough
-        if first_half or second_half:
-            # logger.debug(
-            #     f"Sandwich skipped for {employee} on {date} "
-            #     f"(first_half_done={first_half}, second_half_done={second_half})"
-            # )
+        
+        # Must have shift to decide logic
+        if not att.shift:
             return 0
-        # If attendance exists but not enough work 
-        # Lets create sandwich if none of half is done
-        # return 0
+        shift = frappe.get_cached_doc("Shift Type", att.shift)
+        if not shift:
+            return 0  # cannot decide → safest is skip sandwich
+        # ------------------------------------------------------------
+        # FLEXI vs NON-FLEXI handling
+        # ------------------------------------------------------------ 
+        # FLEXI SHIFT LOGIC  
+        working_hours = flt(att.working_hours or 0)      
+        if cint(getattr(shift, "custom_flexible_shift", 0)):
+            if working_hours == 0:
+                return 0  # data not reliable yet
+            # define half-day threshold (adjust if you store elsewhere)
+            # fallback → derive from shift hours
+            if not half_day_threshold:
+                total_hours = flt(getattr(shift, "working_hours", 0))
+                half_day_threshold = total_hours / 2 if total_hours else 0
+
+            if working_hours >= half_day_threshold:
+                return 0  # worked enough → skip sandwich
+
+        # NON-FLEX SHIFT LOGIC
+        else:
+            first_half = int(att.get("custom_first_half_done") or 0)
+            second_half = int(att.get("custom_second_half_done") or 0)
+
+            if first_half or second_half:
+                return 0
     # ------------------------------------------------------------
     # Skip if leave already exists
     # ------------------------------------------------------------
