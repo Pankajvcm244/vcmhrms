@@ -522,11 +522,6 @@ class VCMShiftType(HRMSShiftType):
 
 @frappe.whitelist()
 def run_late_grace_quota_manual():
-    # logger.debug("[run_late_grace_quota_manual] GLOBAL RUN")
-    reconcile_late_grace_quota_global()
-   
-
-def reconcile_late_grace_quota_global():
     # logger.debug("[LATE GRACE GLOBAL] START")
     settings = frappe.get_cached_doc("VCM HR Settings")
     lock_date = settings.attendance_locked_upto
@@ -634,6 +629,7 @@ def reconcile_late_grace_quota_global():
                     "late_entry": doc.late_entry,
                     "custom_first_half_done": doc.custom_first_half_done,
                     "custom_second_half_done": doc.custom_second_half_done,
+                    "half_day_status":doc.half_day_status,
                     "modified": now_datetime(),
                 }
             )
