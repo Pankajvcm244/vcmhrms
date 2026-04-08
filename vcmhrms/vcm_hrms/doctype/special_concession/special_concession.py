@@ -4,6 +4,8 @@
 import frappe
 from frappe.model.document import Document
 from frappe.utils import get_datetime, getdate, today, add_days, add_to_date, now
+from datetime import datetime
+from frappe.utils import get_datetime, add_days, add_to_date, get_time
 
 
 class SpecialConcession(Document):
@@ -178,6 +180,12 @@ class SpecialConcession(Document):
         shift_start_dt = get_datetime(f"{self.date} {shift.start_time}")
         shift_end_dt = get_datetime(f"{self.date} {shift.end_time}")
 
+        #  HANDLE NIGHT SHIFT (end < start means next day)
+        is_night_shift = shift.end_time < shift.start_time
+
+        if is_night_shift:
+            shift_end_dt = add_days(shift_end_dt, 1)
+
         begin_before = shift.begin_check_in_before_shift_start_time or 0
         allow_after = shift.allow_check_out_after_shift_end_time or 0
 
@@ -192,10 +200,14 @@ class SpecialConcession(Document):
 
             applied_in_dt = get_datetime(f"{self.date} {self.applied_in_time}")
 
+            #  FIX: use get_time (no type error)
+            if is_night_shift and get_time(self.applied_in_time) < get_time(shift.start_time):
+                applied_in_dt = add_days(applied_in_dt, 1)
+
             if not (allowed_in_start <= applied_in_dt <= allowed_in_end):
                 frappe.throw(
                     f"Applied In Time must be between "
-                    f"{allowed_in_start.time()} and {allowed_in_end.time()}"
+                    f"{allowed_in_start.strftime('%d-%m %H:%M')} and {allowed_in_end.strftime('%d-%m %H:%M')}"
                 )
 
         # Validate OUT time
@@ -203,8 +215,12 @@ class SpecialConcession(Document):
 
             applied_out_dt = get_datetime(f"{self.date} {self.applied_out_time}")
 
+            #  FIX: use get_time (no type error)
+            if is_night_shift and get_time(self.applied_out_time) < get_time(shift.start_time):
+                applied_out_dt = add_days(applied_out_dt, 1)
+
             if not (allowed_out_start <= applied_out_dt <= allowed_out_end):
                 frappe.throw(
                     f"Applied Out Time must be between "
-                    f"{allowed_out_start.time()} and {allowed_out_end.time()}"
+                    f"{allowed_out_start.strftime('%d-%m %H:%M')} and {allowed_out_end.strftime('%d-%m %H:%M')}"
                 )
