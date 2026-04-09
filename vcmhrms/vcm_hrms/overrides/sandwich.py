@@ -1,7 +1,9 @@
 # Copyright (c) 2026, Pankaj Sharma and contributors
 # For license information, please see license.txt
 import frappe
-from frappe.utils import getdate, nowdate, add_days, get_datetime, cint, flt
+from frappe.utils import getdate, nowdate, add_days, get_datetime, cint, flt, now_datetime, date_diff
+from vcmhrms.vcm_hrms.overrides.VCMShiftType import _unlink_day_checkins
+
 import logging
 logger = logging.getLogger(__name__)
 SANDWICH_LEAVE_TYPE = "Sandwich Absent"
@@ -347,6 +349,9 @@ def _clear_sandwich_block(employee, start, end):
     next_status = _get_attendance_status(employee, next_day)
     # logger.debug(f"Clearing sandwich block for {employee} from {start} to {end}")    
     # ❌ Otherwise clear ALL sandwich leaves in block
+    # -----------------------------------------------------
+    # STEP 1: Delete sandwich leaves
+    # -----------------------------------------------------
     leaves = frappe.get_all(
         "Leave Application",
         filters={
@@ -363,46 +368,130 @@ def _clear_sandwich_block(employee, start, end):
             doc = frappe.get_doc("Leave Application", name)
             doc.cancel()
             frappe.delete_doc("Leave Application", name, force=1)
-            logger.info(
-                f"[sandwich cleared] {employee} {start}->{end} "
-                f"prev={prev_status} next={next_status}"
-            )
+            # logger.debug(
+            #     f"[SANDWICH CLEARED ****] {employee} {start}->{end} "
+            #     f"prev={prev_status} next={next_status}"
+            # )
             cleared += 1
         except Exception:
             logger.exception(f"[sandwich clear failed] {name}")
+    # -----------------------------------------------------
+    # STEP 2: Process each date in block
+    # -----------------------------------------------------
+    now = now_datetime()
+    total_days = date_diff(end, start) + 1
+    for i in range(total_days):
+        d = add_days(start, i)
+        start_dt = get_datetime(d)
+        end_dt = get_datetime(add_days(d, 1))
+        # fetch checkins for that day
+        checkins = frappe.get_all(
+            "Employee Checkin",
+            filters={
+                "employee": employee,
+                "time": ("between", [start_dt, end_dt]),
+                "offshift": 0
+            },
+            fields=["name"],
+        )
+        # logger.debug(f"Checkin sandwich block for {checkins}")    
+        if not checkins:
+            continue
+        # -------------------------------------------------
+        # STEP 2A: unlink (important)
+        # -------------------------------------------------
+        _unlink_day_checkins(employee, d)
+        # -------------------------------------------------
+        # STEP 2B: mark for repair via modified
+        # -------------------------------------------------
+        for c in checkins:
+            try:
+                frappe.db.set_value(
+                    "Employee Checkin",
+                    c.name,
+                    "modified",
+                    now,
+                    update_modified=True
+                )
+            except Exception:
+                logger.exception(f"[CHECKIN TOUCH FAILED] {c.name}")
+
+        # logger.info(
+        #     f"[SANDWICH REPAIR MARKED] {employee} {d} "
+        #     f"checkins={len(checkins)}"
+        # )
     return cleared
 
 
-def clear_sandwich_if_checkin(employee, date):
-    start_dt = frappe.utils.get_datetime(date)
-    end_dt = frappe.utils.get_datetime(add_days(date, 1))
-    checkin = frappe.db.exists(
-        "Employee Checkin",
-        {
-            "employee": employee,
-            "time": ("between", [start_dt, end_dt])
-        }
-    )
-    if not checkin:
-        return
-    leaves = frappe.get_all(
-        "Leave Application",
-        filters={
-            "employee": employee,
-            "leave_type": SANDWICH_LEAVE_TYPE,
-            "from_date": ("<=", date),
-            "to_date": (">=", date),
-            "docstatus": 1
-        },
-        pluck="name"
-    )
-    for name in leaves:
-        doc = frappe.get_doc("Leave Application", name)
-        doc.cancel()
-        frappe.delete_doc(
-            "Leave Application",
-            doc.name,
-            force=1
-        )
-        logger.info(f"Sandwich leave cancelled due to checkin: {employee} {date}")
+# def clear_sandwich_if_checkin(employee, date):
+#     start_dt = frappe.utils.get_datetime(date)
+#     end_dt = frappe.utils.get_datetime(add_days(date, 1))
+#     # -----------------------------------------------------
+#     # STEP 0: Fetch checkins properly (NOT db.exists)
+#     # -----------------------------------------------------
+#     checkins = frappe.get_all(
+#         "Employee Checkin",
+#         filters={
+#             "employee": employee,
+#             "time": ("between", [start_dt, end_dt]),
+#             "offshift": 0
+#         },
+#         fields=["name", "shift"],
+#         order_by="time asc"
+#     )
+#     if not checkins:
+#         return
+#     shift = checkins[0].shift  # may be None (acceptable in your system)
+#     # -----------------------------------------------------
+#     # STEP 1: Delete sandwich leave
+#     # -----------------------------------------------------
+#     leaves = frappe.get_all(
+#         "Leave Application",
+#         filters={
+#             "employee": employee,
+#             "leave_type": SANDWICH_LEAVE_TYPE,
+#             "from_date": ("<=", date),
+#             "to_date": (">=", date),
+#             "docstatus": 1
+#         },
+#         pluck="name"
+#     )
+#     for name in leaves:
+#         try:
+#             doc = frappe.get_doc("Leave Application", name)
+#             doc.cancel()
+#             frappe.delete_doc("Leave Application", doc.name, force=1)
+#             logger.info(
+#                 f"[SANDWICH CLEARED] {employee} {date} | leave={name}"
+#             )
+#         except Exception:
+#             logger.exception(f"[SANDWICH CLEAR FAILED] {name}")
+#     # -----------------------------------------------------
+#     # STEP 2: Unlink checkins (CRITICAL for rebuild)
+#     # -----------------------------------------------------
+#     _unlink_day_checkins(employee, date)
+#     logger.info(
+#         f"[SANDWICH] Unlinked checkins for {employee} {date}"
+#     )
+#     # -----------------------------------------------------
+#     # STEP 3: Trigger repair via modified timestamp
+#     # (NO direct process_auto_attendance call)
+#     # -----------------------------------------------------
+#     now = now_datetime()
+#     for c in checkins:
 
+#         try:
+#             frappe.db.set_value(
+#                 "Employee Checkin",
+#                 c.name,
+#                 "modified",
+#                 now,
+#                 update_modified=True
+#             )
+#         except Exception:
+#             logger.exception(f"[CHECKIN TOUCH FAILED] {c.name}")
+
+#     logger.info(
+#         f"[SANDWICH] Marked {len(checkins)} checkins for repair "
+#         f"{employee} {date} shift={shift}"
+#     )

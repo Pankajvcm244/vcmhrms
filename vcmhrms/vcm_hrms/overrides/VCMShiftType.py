@@ -264,7 +264,10 @@ class VCMShiftType(HRMSShiftType):
                 if key in processed:
                     continue
                 processed.add(key)
-                # logger.debug(f"[PROCESS] {employee} {adate} shift={shift_name}")
+                # logger.debug(f"[PROCESS 1] {employee} {adate} shift={shift_name}")
+                # -----------------------------------------
+                # STEP 1 — STRICT (your original logic)
+                # -----------------------------------------
                 attendance = frappe.get_value(
                     "Attendance",
                     {
@@ -282,8 +285,30 @@ class VCMShiftType(HRMSShiftType):
                     ],
                     as_dict=True,
                 )
-                # if self.name == "GENERAL9_30_to_6_00":
-                #     logger.debug(f"Processing bucket employee {employee} date {adate} attendance {attendance}")
+                # logger.debug(f"[PROCESS 2] {employee} {adate} shift={shift_name}, att {attendance}")
+                # -----------------------------------------
+                # STEP 2 — FALLBACK (ONLY if strict fails)
+                # -----------------------------------------
+                if not attendance:
+                    attendance = frappe.get_value(
+                        "Attendance",
+                        {
+                            "employee": employee,
+                            "attendance_date": adate,
+                            "docstatus": ("<", 2),
+                        },
+                        [
+                            "name",
+                            "docstatus",
+                            "shift",
+                            "leave_application",
+                            "leave_type",
+                        ],
+                        as_dict=True,
+                    )                    
+                # logger.debug(f"[PROCESS 3] {employee} {adate} shift={shift_name} , att {attendance}")
+                if self.name == "GENERAL9_30_to_6_00":
+                    logger.debug(f"Processing bucket employee {employee} date {adate} attendance {attendance}")
                 # ---------------------------------------------------
                 # Case 1 — no attendance (holiday / weekoff)
                 # ---------------------------------------------------
@@ -297,10 +322,14 @@ class VCMShiftType(HRMSShiftType):
                     continue
                 if attendance.docstatus == 2:
                     continue
-                att_doc = frappe.get_doc("Attendance", attendance.name)                
+                            
                 # =====================================================
                 # CASE 2 — LEAVE ATTENDANCE → RECOMPUTE (NO DELETE)
                 # =====================================================
+                att_doc = frappe.get_doc("Attendance", attendance.name) 
+                # in sandwich leave shift is not coming to attendence
+                if not att_doc.shift:
+                    att_doc.shift = shift_name  
                 if attendance.leave_application or attendance.leave_type:
                     # logger.debug(f"[LEAVE RECOMPUTE] {att_doc.name}")
                     try:                        
@@ -332,7 +361,7 @@ class VCMShiftType(HRMSShiftType):
                                 # OT case
                                 att_doc.in_time = checkins[0].time
                                 att_doc.out_time = checkins[-1].time
-
+                                # logger.debug(f"[LEAVE FULL 1] att_doc.in_time {att_doc.in_time} att_doc.out_time {att_doc.out_time} ")
                                 shift_doc = frappe.get_cached_doc("Shift Type", shift_name)
                                 if cint(getattr(shift_doc, "custom_flexible_shift", 0)):
                                     apply_flex_min_hours(att_doc)
@@ -346,6 +375,7 @@ class VCMShiftType(HRMSShiftType):
                                     end,
                                     att_doc.name
                                 )
+                                # logger.debug(f"[LEAVE FULL 2] docname {att_doc.name} , att_doc.in_time {att_doc.in_time} att_doc.out_time {att_doc.out_time} hr {att_doc.working_hours}")
                                 frappe.db.set_value(
                                     "Attendance",
                                     att_doc.name,
@@ -354,15 +384,17 @@ class VCMShiftType(HRMSShiftType):
                                         "out_time": att_doc.out_time,
                                         "working_hours": att_doc.working_hours,
                                         "status": "On Leave",  # 🔥 FORCE BACK
+                                        "shift": att_doc.shift,
                                         "half_day_status": None,
                                         "half_day_status": att_doc.half_day_status,
                                         "custom_late_entry_within_grace": att_doc.custom_late_entry_within_grace,
                                         "custom_first_half_done": att_doc.custom_first_half_done,
-                                        "custom_second_half_done":att_doc.custom_second_half_done,
+                                        "custom_second_half_done":att_doc.custom_second_half_done,                                        
                                         "modified": now_datetime(),
                                     }
                                 )
                             else:
+                                # logger.debug(f"[LEAVE FULL 3] NO checkin ")
                                 frappe.db.set_value(
                                     "Attendance",
                                     att_doc.name,
@@ -455,6 +487,7 @@ class VCMShiftType(HRMSShiftType):
                     try:
                         if att_doc.docstatus == 1:
                             att_doc.cancel()
+                        # logger.debug(f"[FLEX SKIP DELETE] Fresh {att_doc.name}")
                         frappe.delete_doc("Attendance", att_doc.name, force=1)
                     except Exception:
                         logger.exception(f"[FLEX DELETE FAILED] {att_doc.name}")
@@ -488,7 +521,7 @@ class VCMShiftType(HRMSShiftType):
                 try:
                     # logger.debug("BEFORE PROCESS AUTO")
                     shift_doc.process_auto_attendance()  
-                    # logger.debug("AFTER PROCESS AUTO")                   
+                    # logger.debug("AFTE PROCESS AUTO")                   
                 finally:
                     frappe.flags.in_auto_attendance_run = False            
         finally:

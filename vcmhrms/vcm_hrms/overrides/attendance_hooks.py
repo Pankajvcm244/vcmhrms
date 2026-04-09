@@ -288,10 +288,12 @@ def apply_nonflex_strict_hours(doc, method=None):
         return
     # Must have context + in/out
     if not getattr(doc, "shift", None) or not getattr(doc, "attendance_date", None):
-        logger.debug(f"[apply_nonflex_strict_hours 1.1.1.1] return 1")
+        # var1 = getattr(doc, "shift", None)
+        # var2 = getattr(doc, "attendance_date", None)
+        # logger.debug(f"[apply_nonflex_strict_hours 1.1.1.1] {var1} , {var2} return 1")
         return
     if not getattr(doc, "in_time", None) or not getattr(doc, "out_time", None):
-        logger.debug(f"[apply_nonflex_strict_hours 1.1.1.2] return 1")
+        logger.debug(f"[apply_nonflex_strict_hours 1.1.1.2]  , return 1")
         return
     shift = frappe.get_cached_doc("Shift Type", doc.shift)
     
@@ -301,19 +303,24 @@ def apply_nonflex_strict_hours(doc, method=None):
     logger.debug(f"[apply_nonflex_strict_hours 3] Shift {shift.name} is non-flex; applying strict hours enforcement for {doc.name}")
     # Skip leave-driven attendance
     status_lc = (getattr(doc, "status", "") or "").strip().lower()
+    leave_type = (getattr(doc, "leave_type", "") or "").strip()
     #  On leave status if for full day leave, for half day it is "Half Day"
     #  values for status are Present, Absent, On Leave, Half Day
     # values for other half is Present, Absent
     if status_lc in ("on leave", "holiday"):
         # Skip as this is full day leave
-        return
+        # 👇 Check if it is Sandwich Absent
+        if leave_type != "Sandwich Absent":
+            # handle non sandwich leave case return else continue
+            return  # normal leave → skip
+        
     #  on leave day we may have s=checkin logs, so still process and mark flags
     if getattr(doc, "leave_application", None) or getattr(doc, "leave_type", None):
         # allow processing if actual punches exist
         if not (getattr(doc, "in_time", None) and getattr(doc, "out_time", None)):
             logger.debug(f"[apply_nonflex_strict_hours 1.1.1.3] return ")
             return
-    logger.debug(f"[apply_nonflex_strict_hours 1.1] Evaluating {doc.name} for non-flex strict hours enforcement") 
+    # logger.debug(f"[apply_nonflex_strict_hours 1.1] Evaluating {doc.name} for non-flex strict hours enforcement") 
     in_dt = get_datetime(doc.in_time)
     out_dt = get_datetime(doc.out_time)
     if not in_dt or not out_dt or out_dt <= in_dt:
