@@ -68,6 +68,11 @@ def run_sandwich_policy(from_date=None, to_date=None, employee=None):
         hol_dates = _get_holiday_dates_for_employee(emp, from_date, to_date)
         if not hol_dates:
             continue
+        # logger.debug(f"[run_sandwich_policy 1-1]  employees {emp}, holiday {hol_dates} ")
+        # Skip if employee has no shift assigned in this range
+        if not _has_shift_in_range(emp, from_date, to_date):
+            # logger.debug(f"[run_sandwich_policy 1-2]  No shift assigned employees {emp}, holiday {hol_dates} ")
+            continue
         res = _run_sandwich_for_employee(emp, from_date, to_date, hol_dates)
         created += res["created"]
         cleared += res["cleared"]    
@@ -79,7 +84,21 @@ def run_sandwich_policy(from_date=None, to_date=None, employee=None):
         "cleared": cleared
     }
 
-
+def _has_shift_in_range(employee, from_date, to_date):
+    return frappe.db.sql("""
+        SELECT name
+        FROM `tabShift Assignment`
+        WHERE employee = %s
+          AND docstatus = 1
+          AND status = 'Active'
+          AND start_date <= %s
+          AND (
+                end_date IS NULL
+                OR end_date = ''
+                OR end_date >= %s
+              )
+        LIMIT 1
+    """, (employee, to_date, from_date))
 
 # ------------------------------------------------------------
 # Helpers: Holiday/WeeklyOff dates for employee
@@ -210,10 +229,10 @@ def _run_sandwich_for_employee(employee, from_date, to_date, hol_dates):
         next_day = add_days(block_end, 1)
         prev_status = get_status(prev_day)
         next_status = get_status(next_day)
-        logger.debug(
-            f"[SANDWICH] {employee} block {block_start}->{block_end} "
-            f"prev={prev_status} next={next_status}"
-        )
+        # logger.debug(
+        #     f"[SANDWICH] {employee} block {block_start}->{block_end} "
+        #     f"prev={prev_status} next={next_status}"
+        # )
         # ---------------------------------------------------
         # 🎯 CORE RULE
         # ---------------------------------------------------
