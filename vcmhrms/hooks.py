@@ -117,13 +117,17 @@ app_license = "mit"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
+permission_query_conditions = {
+    "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Salary Structure Assignment": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Additional Salary": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Payroll Entry": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Salary Structure": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+}
 #
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+has_permission = {
+    "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.has_permission"
+}
 
 # DocType Class
 # ---------------
@@ -134,7 +138,8 @@ app_license = "mit"
 # }
 override_doctype_class = {
     "Shift Type": "vcmhrms.vcm_hrms.overrides.VCMShiftType.VCMShiftType",
-    "Salary Structure": "vcmhrms.vcm_hrms.overrides.VcmSalaryStructure.VcmSalaryStructure"
+    "Salary Structure": "vcmhrms.vcm_hrms.overrides.VcmSalaryStructure.VcmSalaryStructure",
+    "Salary Slip": "vcmhrms.vcm_hrms.overrides.salary_slip.CustomSalarySlip"
 }
 
 
