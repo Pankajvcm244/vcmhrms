@@ -5,10 +5,17 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import get_datetime, getdate, today, add_days, add_to_date, now
 from datetime import datetime
+from frappe.utils import now_datetime
+from frappe.model.naming import make_autoname
 from frappe.utils import get_datetime, add_days, add_to_date, get_time
 
 
 class SpecialConcession(Document):
+    
+    def autoname(self):
+        now = now_datetime()
+        mmyy = now.strftime("%m%y")
+        self.name = make_autoname(f"SPC-{mmyy}-.#####")
 
     # ================= VALIDATE =================
 
