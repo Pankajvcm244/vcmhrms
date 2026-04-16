@@ -124,10 +124,10 @@ permission_query_conditions = {
     "Payroll Entry": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Salary Structure": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
 }
-#
-has_permission = {
-    "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.has_permission"
-}
+# #
+# has_permission = {
+#     "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.has_permission"
+# }
 
 # DocType Class
 # ---------------
