@@ -27,134 +27,450 @@ frappe.ui.form.on("VCM HR Settings", {
             frm.set_df_property("attendance_locked_upto", "read_only", 1);
         }
         update_repair_days_limit(frm);
-        
-        const btn_auto = frm.add_custom_button(__("Run Auto Attendance Now"), () => {
+        // -----------------------------
+        // STATE
+        // -----------------------------
+        let auto_attendance_running = false;
+        // -----------------------------
+        // AUTO ATTENDANCE BUTTON
+        // -----------------------------
+        const btn_auto = frm.add_custom_button(__("Run Auto Attendance Now in Background"), () => {
             if (auto_attendance_running) {
                 frappe.msgprint(__("Auto Attendance is already running."));
                 return;
             }
             frappe.confirm(
-                __("This will run HRMS auto-attendance for all enabled shifts. Continue?"),
-                async () => {
-                    auto_attendance_running = true;
-                    btn_auto.prop("disabled", true);
-                    frappe.dom.freeze(__("Running auto-attendance…"));
-                    try {
-                        const r = await frappe.call({
-                            method: "vcmhrms.vcm_hrms.overrides.VCMShiftType.run_auto_attendance_now",
-                            args: {
-                            // employee: "HP1671"
-                            },
+                    __("This will run HRMS auto-attendance for all active employee with enabled shifts in background. Continue?"),
+                    async () => {
+                        auto_attendance_running = true;
+                        btn_auto.prop("disabled", true);
+                        frappe.show_alert({
+                            message: __("Starting Auto Attendance..."),
+                            indicator: "blue"
                         });
-                        // console.log("Auto Attendance Response:", r);
-                        if (!r.message || !r.message.ok) {
+                        // frappe.dom.freeze(__("Running auto-attendance…"));
+                        try {
+                            const r = await frappe.call({
+                                method: "vcmhrms.vcm_hrms.overrides.VCMShiftType.run_auto_attendance_now",
+                                freeze: false,
+                                args: {
+                                // employee: "HP1671"
+                                },
+                            });
+                            if (!r.message) throw new Error("Invalid response");
+                            // -----------------------------
+                            // ALREADY RUNNING (backend guard)
+                            // -----------------------------
+                            if (r.message.already_running) {
+                                frappe.msgprint({
+                                    title: __("Already Running"),
+                                    message: __("Auto Attendance is already in progress."),
+                                    indicator: "orange"
+                                });
+                                // ✅ Start polling job status
+                                monitor_auto_attendance(frm, btn_auto, () => {
+                                    auto_attendance_running = false;
+                                });
+                                return;
+                            }                    
+                            // -----------------------------
+                            // QUEUED
+                            // -----------------------------
+                            if (r.message.queued) {
+                                frappe.show_alert({
+                                    message: __("Auto Attendance started in background"),
+                                    indicator: "green"
+                                });
+                                monitor_auto_attendance(frm, btn_auto, () => {
+                                    auto_attendance_running = false;
+                                });
+                            } else {
+                                throw new Error("Queue failed");
+                            }
+
+                        } catch (e) {
+                            console.error(e);
+
                             frappe.msgprint({
-                                title: __("Auto Attendance Failed"),
-                                message: __("No attendance processed."),
+                                title: __("Error"),
+                                message: __("Failed to start auto attendance."),
                                 indicator: "red"
                             });
+
+                            auto_attendance_running = false;
+                            btn_auto.prop("disabled", false);
+                        }
+                            
+                    } // end of on confirm
+                ); // end of confirm
+            } // end of button
+        ); // end of add_custom_button
+        // -----------------------------
+        // LATE GRACE QUOTA RECALC BUTTON
+        // -----------------------------
+        frm.add_custom_button(__('Recalculate Late Grace Quota'), () => {
+            frappe.confirm(
+                __('Recalculate Late Grace Quota in background?'),
+                async () => {
+                    frappe.show_alert({
+                        message: __('Starting Late Grace recalculation...'),
+                        indicator: 'blue'
+                    });
+                    try {
+                        const r = await frappe.call({
+                            method: 'vcmhrms.vcm_hrms.overrides.VCMShiftType.run_late_grace_quota_now',
+                            freeze: false   // ❗ important: no UI freeze
+                        });
+                        // -----------------------------
+                        // Already Running
+                        // -----------------------------
+                        if (r.message?.already_running) {
+                            frappe.msgprint({
+                                title: __('Already Running'),
+                                message: __('Late Grace calculation is already in progress.'),
+                                indicator: 'orange'
+                            });
+                            monitor_late_grace(frm);
                             return;
                         }
-                        frappe.msgprint({
-                            title: __("Auto Attendance Completed now"),
-                            message: __(
-                                "Processed: {0} shifts",
-                                [r.message.processed || 0]
-                            ),
-                            indicator: "green"
+                        // -----------------------------
+                        // Queued
+                        // -----------------------------
+                        if (!r.message?.queued) {
+                            throw new Error("Queue failed");
+                        }
+                        frappe.show_alert({
+                            message: __('Late Grace recalculation started'),
+                            indicator: 'green'
                         });
-
-                        frm.reload_doc();
+                        // ✅ Start polling
+                        monitor_late_grace(frm);
                     } catch (e) {
-
                         console.error(e);
                         frappe.msgprint({
-                            title: __("Error"),
-                            message: __("Auto Attendance execution failed."),
-                            indicator: "red"
+                            title: __('Error'),
+                            message: __('Failed to start Late Grace recalculation'),
+                            indicator: 'red'
                         });
-                    } finally {
-                        frappe.dom.unfreeze();
-                        auto_attendance_running = false;
-                        btn_auto.prop("disabled", false);
                     }
                 }
             );
         });
-        frm.add_custom_button('Recalculate Late Grace Quota', () => {
-            frappe.call({
-                method: 'vcmhrms.vcm_hrms.overrides.VCMShiftType.run_late_grace_quota_manual',
-                freeze: true,
-                freeze_message: 'Recalculating Late Grace...'
-            });
-        });
         // -----------------------------
         // SANDWICH LEAVE BUTTON
         // -----------------------------
-        const btn_sandwich = frm.add_custom_button(__("Run Sandwich Leave"), () => {
+       const btn_sandwich = frm.add_custom_button(__('Run Sandwich Leave'), () => {
             if (sandwich_running) {
                 frappe.msgprint(__("Sandwich Leave process is already running."));
                 return;
             }
             frappe.confirm(
-                __("This will run the Sandwich Leave policy. Continue?"),
+                __("Run Sandwich Leave policy in background?"),
                 async () => {
                     sandwich_running = true;
                     btn_sandwich.prop("disabled", true);
-                    frappe.dom.freeze(__("Running Sandwich Leave…"));
+                    frappe.show_alert({
+                        message: __("Starting Sandwich Leave..."),
+                        indicator: "blue"
+                    });
                     try {
                         const r = await frappe.call({
-                            method: "vcmhrms.vcm_hrms.overrides.sandwich.run_sandwich_daily",
-                            args: {
-                            // optional: employee: "HP1671"
-                            },
+                            method: "vcmhrms.vcm_hrms.overrides.sandwich.run_sandwich_now",
+                            freeze: false   // ❗ remove freeze
                         });
-                        if (!r.message || !r.message.ok) {
+                        // -----------------------------
+                        // Already Running
+                        // -----------------------------
+                        if (r.message?.already_running) {
                             frappe.msgprint({
-                                title: __("Sandwich Leave Failed"),
-                                message: __("No sandwich leave processed."),
-                                indicator: "red"
+                                title: __("Already Running"),
+                                message: __("Sandwich process is already running."),
+                                indicator: "orange"
+                            });
+                            monitor_sandwich(frm, btn_sandwich, () => {
+                                sandwich_running = false;
                             });
                             return;
                         }
-                        frappe.msgprint({
-                            title: __("Sandwich Leave Completed"),
-                            message: __(
-                                "Processed: {0} | Created: {1} | Cleared: {2}",
-                                [
-                                    r.message.processed || 0,
-                                    r.message.created || 0,
-                                    r.message.cleared || 0
-                                ]
-                            ),
+                        // -----------------------------
+                        // Queued
+                        // -----------------------------
+                        if (!r.message?.queued) {
+                            throw new Error("Queue failed");
+                        }
+                        frappe.show_alert({
+                            message: __("Sandwich Leave started"),
                             indicator: "green"
                         });
-                        frm.reload_doc();
+                        // ✅ Start polling
+                        monitor_sandwich(frm, btn_sandwich, () => {
+                            sandwich_running = false;
+                        });
                     } catch (e) {
-
                         console.error(e);
-
                         frappe.msgprint({
                             title: __("Error"),
-                            message: __("Sandwich Leave execution failed."),
+                            message: __("Failed to start Sandwich Leave."),
                             indicator: "red"
                         });
-                    } finally {
-                        frappe.dom.unfreeze();
                         sandwich_running = false;
                         btn_sandwich.prop("disabled", false);
                     }
                 }
             );
         });
-    },
+    }, // end of refresh
     attendance_locked_upto(frm) {
         update_repair_days_limit(frm);
     },
     repair_window_days(frm) {
         enforce_repair_days_limit(frm);
     }
-});
+}); // end of frappe.ui.form.on
+
+let AUTO_ATTENDANCE_INTERVAL = null;
+async function monitor_auto_attendance(frm, btn_auto, on_finish) {
+    // ❗ prevent duplicate intervals
+    if (AUTO_ATTENDANCE_INTERVAL) {
+        clearInterval(AUTO_ATTENDANCE_INTERVAL);
+    }
+    let attempts = 0;
+    const max_attempts = 240; // ~20 minutes (5 sec interval)
+    const interval = setInterval(async () => {
+        try {
+            const r = await frappe.call({
+                method: "vcmhrms.vcm_hrms.overrides.VCMShiftType.get_auto_attendance_status"
+            });
+            const status = r.message || {};
+            // ------------------------
+            // RUNNING STATE
+            // ------------------------
+            if (status.status === "running") {
+                const shift = status.current_shift || "-";
+                const processed = status.processed || 0;
+                const total = status.total || "?";
+                frappe.show_alert({
+                    message: __(
+                        "Processing {0}/{1} • Shift: {2}",
+                        [processed, total, shift]
+                    ),
+                    indicator: "orange"
+                });
+            }
+            // ------------------------
+            // COMPLETED
+            // ------------------------
+            if (status.status === "completed") {
+                clearInterval(interval);
+                frappe.msgprint({
+                    title: __("Auto Attendance Completed"),
+                    message: __(
+                        "Processed: {0} shifts",
+                        [status.processed || 0]
+                    ),
+                    indicator: "green"
+                });
+                frm.reload_doc();
+                btn_auto.prop("disabled", false);
+                on_finish && on_finish();
+            }
+            // ------------------------
+            // FAILED
+            // ------------------------
+            if (status.status === "failed") {
+                clearInterval(interval);
+                frappe.msgprint({
+                    title: __("Auto Attendance Failed"),
+                    message: status.error || __("Unknown error"),
+                    indicator: "red"
+                });
+                btn_auto.prop("disabled", false);
+                on_finish && on_finish();
+            }
+        } catch (err) {
+            console.error("Polling error", err);
+        }
+        // ------------------------
+        // TIMEOUT PROTECTION
+        // ------------------------
+        attempts++;
+        if (attempts > max_attempts) {
+            clearInterval(interval);
+
+            frappe.msgprint({
+                title: __("Timeout"),
+                message: __("Auto Attendance is taking longer than expected."),
+                indicator: "orange"
+            });
+
+            btn_auto.prop("disabled", false);
+            on_finish && on_finish();
+        }
+    }, 5000); // poll every 5 sec
+}
+
+
+let LATE_GRACE_INTERVAL = null;
+function monitor_late_grace(frm) {
+    // ❗ prevent duplicate polling
+    if (LATE_GRACE_INTERVAL) {
+        clearInterval(LATE_GRACE_INTERVAL);
+    }
+    let attempts = 0;
+    const max_attempts = 120; // ~10 min
+    LATE_GRACE_INTERVAL = setInterval(async () => {
+        try {
+            const r = await frappe.call({
+                method: "vcmhrms.vcm_hrms.overrides.VCMShiftType.get_late_grace_status"
+            });
+            const status = r.message || {};
+            // ------------------------
+            // RUNNING
+            // ------------------------
+            if (status.status === "running") {
+                frappe.show_alert({
+                    message: __(
+                        "Processing {0}/{1} • Employee: {2}",
+                        [
+                            status.processed || 0,
+                            status.total || "?",
+                            status.current_employee || "-"
+                        ]
+                    ),
+                    indicator: "orange"
+                });
+            }
+            // ------------------------
+            // COMPLETED
+            // ------------------------
+            if (status.status === "completed") {
+                clearInterval(LATE_GRACE_INTERVAL);
+                frappe.msgprint({
+                    title: __("Completed"),
+                    message: __(
+                        "Late Grace recalculation completed.<br>Processed: {0}<br>Updated: {1}",
+                        [
+                            status.processed || 0,
+                            status.updated || 0
+                        ]
+                    ),
+                    indicator: "green"
+                });
+
+                frm.reload_doc();
+            }
+            // ------------------------
+            // FAILED
+            // ------------------------
+            if (status.status === "failed") {
+                clearInterval(LATE_GRACE_INTERVAL);
+                frappe.msgprint({
+                    title: __("Failed"),
+                    message: __(
+                        "Error:<br>{0}",
+                        [status.error || __("Unknown error")]
+                    ),
+                    indicator: "red"
+                });
+            }
+        } catch (err) {
+            console.error("Late Grace Polling error", err);
+        }
+        // ------------------------
+        // TIMEOUT
+        // ------------------------
+        attempts++;
+        if (attempts > max_attempts) {
+            clearInterval(LATE_GRACE_INTERVAL);
+            frappe.msgprint({
+                title: __("Timeout"),
+                message: __("Late Grace recalculation is taking too long."),
+                indicator: "orange"
+            });
+        }
+    }, 5000);
+}
+
+//  Sandwich Monitoring
+let SANDWICH_INTERVAL = null;
+function monitor_sandwich(frm, btn_sandwich, on_finish) {
+    if (SANDWICH_INTERVAL) {
+        clearInterval(SANDWICH_INTERVAL);
+    }
+    let attempts = 0;
+    const max_attempts = 120;
+    SANDWICH_INTERVAL = setInterval(async () => {
+        try {
+            const r = await frappe.call({
+                method: "vcmhrms.vcm_hrms.overrides.sandwich.get_sandwich_status"
+            });
+            const status = r.message || {};
+            // ------------------------
+            // RUNNING
+            // ------------------------
+            if (status.status === "running") {
+                frappe.show_alert({
+                    message: __(
+                        "Processing {0}/{1} • Employee: {2}",
+                        [
+                            status.processed || 0,
+                            status.total || "?",
+                            status.current_employee || "-"
+                        ]
+                    ),
+                    indicator: "orange"
+                });
+            }
+            // ------------------------
+            // COMPLETED
+            // ------------------------
+            if (status.status === "completed") {
+                clearInterval(SANDWICH_INTERVAL);
+                frappe.msgprint({
+                    title: __("Sandwich Leave Completed"),
+                    message: __(
+                        "Processed: {0} | Created: {1} | Cleared: {2}",
+                        [
+                            status.processed || 0,
+                            status.created || 0,
+                            status.cleared || 0
+                        ]
+                    ),
+                    indicator: "green"
+                });
+                frm.reload_doc();
+                btn_sandwich.prop("disabled", false);
+                on_finish && on_finish();
+            }
+            // ------------------------
+            // FAILED
+            // ------------------------
+            if (status.status === "failed") {
+                clearInterval(SANDWICH_INTERVAL);
+                frappe.msgprint({
+                    title: __("Sandwich Leave Failed"),
+                    message: status.error || __("Unknown error"),
+                    indicator: "red"
+                });
+                btn_sandwich.prop("disabled", false);
+                on_finish && on_finish();
+            }
+        } catch (err) {
+            console.error("Sandwich polling error", err);
+        }
+        attempts++;
+        if (attempts > max_attempts) {
+            clearInterval(SANDWICH_INTERVAL);
+            frappe.msgprint({
+                title: __("Timeout"),
+                message: __("Sandwich process is taking too long."),
+                indicator: "orange"
+            });
+            btn_sandwich.prop("disabled", false);
+            on_finish && on_finish();
+        }
+    }, 5000);
+}
 
 function update_repair_days_limit(frm) {
     // compute max allowed window

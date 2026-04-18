@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Pankaj Sharma and contributors
 # For license information, please see license.txt
 
+import traceback
+
 import frappe
 from frappe.utils import getdate, nowdate, add_days, now_datetime, get_datetime, cint, flt, today
 import logging
@@ -135,7 +137,7 @@ class VCMShiftType(HRMSShiftType):
     shift.process_auto_attendance()
     """  
     def process_auto_attendance(self, is_manually_triggered=False):
-        # logger.debug("in process_auto_attendance (forcing safe non-manual mode)")
+        logger.debug("in process_auto_attendance (forcing safe non-manual mode)")
         # Then do targeted repair for late-arriving punches,  
         # Unlink/cancel impacted days first, so HRMS can recreate them cleanly on next run.
         self.reconcile_late_checkins()
@@ -175,8 +177,8 @@ class VCMShiftType(HRMSShiftType):
             # logger.debug(f" Adjusted repair_floor based on lock: {repair_floor}")
          # incremental window
         from_dt = get_datetime(last_run) if last_run else add_days(repair_start, -1)
-        if self.name == "GENERAL9_30_to_6_00":
-            logger.debug(f"reconcile_late_checkins 1 checkins {from_dt} (repair {repair_floor}) shift {self.name}") 
+        # if self.name == "GENERAL9_30_to_6_00":
+        #     logger.debug(f"reconcile_late_checkins 1 checkins {from_dt} (repair {repair_floor}) shift {self.name}") 
         # Prevent parallel repair runs           # 
         shifts_to_rebuild = set()     
         try:
@@ -553,129 +555,181 @@ class VCMShiftType(HRMSShiftType):
             self.last_sync_of_checkin = now_datetime()
         return False
 
+
 @frappe.whitelist()
-def run_late_grace_quota_manual():
-    # logger.debug("[LATE GRACE GLOBAL] START")
-    settings = frappe.get_cached_doc("VCM HR Settings")
-    lock_date = settings.attendance_locked_upto
-    if not lock_date:
-        frappe.throw("Attendance lock date is required")
-    lock_date = getdate(lock_date)
-    from_date = add_days(lock_date, 1)
-    to_date = getdate(nowdate())
-    allowed = cint(settings.allowed_late_entry_count or 0)
-    # logger.debug(f"[LATE GRACE WINDOW] {from_date} → {to_date}") 
-    # -----------------------------------
-    # STEP 1: employees
-    # -----------------------------------
-    employees = frappe.get_all(
-        "Attendance",
-        filters={
-            "attendance_date": ["between", [from_date, to_date]],
-            "docstatus": ["!=", 2]
-        },
-        distinct=True,
-        pluck="employee"
-    ) 
-    # -----------------------------------
-    # STEP 2: per employee
-    # -----------------------------------
-    for employee in employees:
-        records = frappe.get_all(
+def run_late_grace_quota_now():
+    if frappe.cache().get_value("late_grace_running"):
+        return {"already_running": True}
+    frappe.cache().set_value("late_grace_running", True)
+    frappe.enqueue(
+        "vcmhrms.vcm_hrms.overrides.VCMShiftType.run_late_grace_quota_background",
+        queue="long",
+        timeout=4000,
+        job_name="late_grace_quota_run",
+        enqueue_after_commit=True
+    )
+    return {"queued": True}
+
+import traceback
+
+@frappe.whitelist()
+def run_late_grace_quota_background():
+    frappe.set_user("Administrator")
+    processed = 0
+    updated = 0
+    frappe.cache().set_value("late_grace_status", {
+        "status": "running",
+        "processed": 0,
+        "updated": 0
+    })
+    try:
+        settings = frappe.get_cached_doc("VCM HR Settings")
+        lock_date = settings.attendance_locked_upto
+        if not lock_date:
+            raise Exception("Attendance lock date is required")
+        lock_date = getdate(lock_date)
+        from_date = add_days(lock_date, 1)
+        to_date = getdate(nowdate())
+        allowed = cint(settings.allowed_late_entry_count or 0)
+        # -----------------------------------
+        # STEP 1: employees
+        # -----------------------------------
+        employees = frappe.get_all(
             "Attendance",
             filters={
-                "employee": employee,
                 "attendance_date": ["between", [from_date, to_date]],
                 "docstatus": ["!=", 2]
             },
-            fields=[
-                "name",
-                "attendance_date",
-                "in_time",
-                "out_time",
-                "shift",
-                "custom_late_entry_within_grace"
-            ],
-            order_by="attendance_date asc"
+            distinct=True,
+            pluck="employee"
         )
-        if not records:
-            continue
-        eligible = []
+        total = len(employees)
         # -----------------------------------
-        # STEP 3: eligibility (SHIFT BASED)
+        # STEP 2: per employee
         # -----------------------------------
-        for r in records:
-            if not r.in_time or not r.shift:
-                continue
-            shift = frappe.get_cached_doc("Shift Type", r.shift)
-            # 🔥 respect shift config
-            if not cint(shift.enable_late_entry_marking):
-                continue
-            late_grace = cint(shift.late_entry_grace_period or 0)
-            in_dt = get_datetime(r.in_time)
-            strict_start, strict_end, _, _ = _strict_shift_bounds_and_lunch(
-                shift=shift,
-                attendance_date=r.attendance_date,
-                in_dt=in_dt,
-                out_dt=get_datetime(r.out_time) if r.out_time else in_dt
-            )
-            if not strict_start:
-                continue
-            grace_cutoff = strict_start + timedelta(minutes=late_grace)
-            if in_dt > strict_start and in_dt <= grace_cutoff:
-                eligible.append({
-                    "name": r.name,
-                    "attendance_date": r.attendance_date,
-                    "current_flag": cint(r.custom_late_entry_within_grace or 0)
+        for idx, employee in enumerate(employees, start=1):
+            try:
+                records = frappe.get_all(
+                    "Attendance",
+                    filters={
+                        "employee": employee,
+                        "attendance_date": ["between", [from_date, to_date]],
+                        "docstatus": ["!=", 2]
+                    },
+                    fields=[
+                        "name",
+                        "attendance_date",
+                        "in_time",
+                        "out_time",
+                        "shift",
+                        "custom_late_entry_within_grace"
+                    ],
+                    order_by="attendance_date asc"
+                )
+                if not records:
+                    continue
+                eligible = []
+                # -----------------------------------
+                # STEP 3: eligibility
+                # -----------------------------------
+                for r in records:
+                    if not r.in_time or not r.shift:
+                        continue
+                    shift = frappe.get_cached_doc("Shift Type", r.shift)
+                    if not cint(shift.enable_late_entry_marking):
+                        continue
+                    late_grace = cint(shift.late_entry_grace_period or 0)
+                    in_dt = get_datetime(r.in_time)
+                    strict_start, strict_end, _, _ = _strict_shift_bounds_and_lunch(
+                        shift=shift,
+                        attendance_date=r.attendance_date,
+                        in_dt=in_dt,
+                        out_dt=get_datetime(r.out_time) if r.out_time else in_dt
+                    )
+                    if not strict_start:
+                        continue
+                    grace_cutoff = strict_start + timedelta(minutes=late_grace)
+                    if in_dt > strict_start and in_dt <= grace_cutoff:
+                        eligible.append({
+                            "name": r.name,
+                            "attendance_date": r.attendance_date
+                        })
+                if not eligible:
+                    continue
+                # -----------------------------------
+                # STEP 4: sort
+                # -----------------------------------
+                eligible.sort(key=lambda x: (x["attendance_date"], x["name"]))
+                # -----------------------------------
+                # STEP 5: apply quota
+                # -----------------------------------
+                allowed_names = {row["name"] for row in eligible[:allowed]}
+                for r in records:
+                    should_be_flag = 1 if r.name in allowed_names else 0
+                    current_flag = cint(r.custom_late_entry_within_grace or 0)
+                    if current_flag == should_be_flag:
+                        continue
+                    doc = frappe.get_doc("Attendance", r.name)
+                    doc.custom_late_entry_within_grace = should_be_flag
+                    apply_nonflex_strict_hours(doc)
+                    frappe.db.set_value(
+                        "Attendance",
+                        doc.name,
+                        {
+                            "custom_late_entry_within_grace": doc.custom_late_entry_within_grace,
+                            "status": doc.status,
+                            "working_hours": doc.working_hours,
+                            "late_entry": doc.late_entry,
+                            "custom_first_half_done": doc.custom_first_half_done,
+                            "custom_second_half_done": doc.custom_second_half_done,
+                            "half_day_status": doc.half_day_status,
+                            "modified": now_datetime(),
+                        }
+                    )
+                    updated += 1
+                processed += 1
+                # ✅ update live status
+                frappe.cache().set_value("late_grace_status", {
+                    "status": "running",
+                    "processed": processed,
+                    "updated": updated,
+                    "total": total,
+                    "current_employee": employee
                 })
-        # logger.debug(f"[LATE GRACE] {employee} eligible={eligible}")
-        if not eligible:
-            continue
+                # ✅ commit per employee (VERY IMPORTANT)
+                frappe.db.commit()
+            except Exception:
+                tb = traceback.format_exc()
+                frappe.log_error(tb, f"Late Grace Failed Employee: {employee}")
+                frappe.cache().set_value("late_grace_status", {
+                    "status": "failed",
+                    "error": f"{employee}:\n{tb[:1000]}"
+                })
+                frappe.db.rollback()
+                return  # fail fast (debug friendly)
         # -----------------------------------
-        # STEP 4: GLOBAL SORT
+        # FINAL STATUS
         # -----------------------------------
-        eligible.sort(key=lambda x: (x["attendance_date"], x["name"]))
-        # -----------------------------------
-        # STEP 5: APPLY QUOTA (FULL SYNC)
-        # -----------------------------------
+        frappe.cache().set_value("late_grace_status", {
+            "status": "completed",
+            "processed": processed,
+            "updated": updated,
+            "total": total
+        })
+    except Exception:
+        tb = traceback.format_exc()
+        frappe.log_error(tb, "Late Grace Global Fatal Error")
+        frappe.cache().set_value("late_grace_status", {
+            "status": "failed",
+            "error": tb[:1500]
+        })
+    finally:
+        frappe.cache().delete_value("late_grace_running")
+        # logger.debug("[LATE GRACE GLOBAL] COMPLETE")
 
-        # determine which should be 1
-        allowed_names = set()
-        for idx, row in enumerate(eligible):
-            if idx < allowed:
-                allowed_names.add(row["name"])
-
-        for r in records:
-            should_be_flag = 1 if r.name in allowed_names else 0
-            current_flag = cint(r.custom_late_entry_within_grace or 0)
-
-            if current_flag == should_be_flag:
-                continue
-
-            doc = frappe.get_doc("Attendance", r.name)
-
-            # 🔥 update flag
-            doc.custom_late_entry_within_grace = should_be_flag
-
-            # 🔥 recompute attendance
-            apply_nonflex_strict_hours(doc)
-
-            frappe.db.set_value(
-                "Attendance",
-                doc.name,
-                {
-                    "custom_late_entry_within_grace": doc.custom_late_entry_within_grace,
-                    "status": doc.status,
-                    "working_hours": doc.working_hours,
-                    "late_entry": doc.late_entry,
-                    "custom_first_half_done": doc.custom_first_half_done,
-                    "custom_second_half_done": doc.custom_second_half_done,
-                    "half_day_status": doc.half_day_status,
-                    "modified": now_datetime(),
-                }
-            )
-    frappe.db.commit()
-    # logger.debug("[LATE GRACE GLOBAL] COMPLETE")
+@frappe.whitelist()
+def get_late_grace_status():
+    return frappe.cache().get_value("late_grace_status") or {}
 
 def _unlink_day_checkins(employee: str, attendance_date):
         """
@@ -948,82 +1002,107 @@ def _shift_scan_window(shift, attendance_date):
 #     )
 #     return True
 
+
+CACHE_KEY_RUNNING = "auto_attendance_running"
+CACHE_KEY_STATUS = "auto_attendance_status"
+
 @frappe.whitelist()
 def run_auto_attendance_now(employee: str | None = None):
     """
-    Manual trigger for testers.
-    Fixes:
-    - Shared repair_start across all shifts
-    - last_repair_run_at updated ONLY once after all shifts
-    - Prevents shift-wise data loss due to watermark overwrite
+    Entry point from frontend.
+    Prevents duplicate runs and enqueues background job.
     """
-    repair_start = now_datetime()   # ✅ single snapshot for entire run
-    details = {"started_at": str(repair_start)}
+    # logger.debug(f"in run_auto_attendance_now {employee} ")  
+    if frappe.cache().get_value(CACHE_KEY_RUNNING):
+        return {"already_running": True}
+    frappe.cache().set_value(CACHE_KEY_RUNNING, True)
+    frappe.enqueue(
+        "vcmhrms.vcm_hrms.overrides.VCMShiftType.run_auto_attendance_background",
+        queue="long",
+        timeout=6000,
+        job_name="auto_attendance_run",
+        employee=employee,
+        enqueue_after_commit=True
+    )
+    # logger.debug(f"exit run_auto_attendance_now  ")  
+    return {"queued": True}
+
+@frappe.whitelist()
+#  sudo supervisorctl tail -f frappe-bench-workers:frappe-bench-frappe-long-worker-0
+def run_auto_attendance_background(employee: str | None = None):
+    """
+    Background execution:
+    - Single repair_start for entire run
+    - Per-shift processing
+    - Safe commit/rollback
+    - Live status tracking
+    """
+    frappe.set_user("Administrator")  
+    repair_start = now_datetime()
     processed = 0
     errors = 0
-    # logger.debug(f"In run_auto_attendance_now ")
+    frappe.cache().set_value(CACHE_KEY_STATUS, {
+        "status": "running",
+        "processed": 0,
+        "errors": 0,
+        "started_at": str(repair_start)
+    })
+    logger.debug(f"in run_auto_attendance_background  ")  
     try:
+        # ---------------------------------------
+        # SHIFT FETCH
+        # ---------------------------------------
         if employee:
-            logger.debug(f"Running auto attendance for employee {employee} with repair_start {repair_start}")
-            # ---------------------------------------
-            # Employee-specific mode
-            # ---------------------------------------
             shift_names = frappe.get_all(
                 "Shift Assignment",
-                filters={"employee": employee, "docstatus": 1, "status": "Active"},
-                pluck="shift_type",
+                filters={
+                    "employee": employee,
+                    "docstatus": 1,
+                    "status": "Active"
+                },
+                pluck="shift_type"
             )
-            for s in set(shift_names):
-                try:
-                    doc = frappe.get_cached_doc("Shift Type", s)
-
-                    # 🔥 IMPORTANT: pass shared repair_start
-                    doc.process_auto_attendance(is_manually_triggered=True)
-                    # OR if process_auto_attendance internally calls it:
-                    # doc.process_auto_attendance(is_manually_triggered=True, repair_start=repair_start)
-                    processed += 1
-                except Exception:
-                    errors += 1
-                    frappe.log_error(
-                        title=f"Auto attendance failed shift={s}",
-                        message=frappe.get_traceback(),
-                    )
-            details.update({
-                "mode": "employee",
-                "employee": employee,
-                "shifts": list(set(shift_names)),
-            })
+            shifts = list(set(shift_names))
         else:
-            # ---------------------------------------
-            # All shifts mode (CUSTOM, NOT HRMS default)
-            # ---------------------------------------
             shifts = frappe.get_all(
                 "Shift Type",
                 filters={"enable_auto_attendance": 1},
-                pluck="name",
+                pluck="name"
             )
-            # logger.debug(f"Running auto attendance for all shifts {shifts} with current time as repair_start {repair_start}")
-            for s in shifts:
-                try:
-                    doc = frappe.get_cached_doc("Shift Type", s)
-                    # 🔥 IMPORTANT: pass same repair_start to all shifts
-                    # doc.reconcile_late_checkins(repair_start=repair_start)
-                    doc.process_auto_attendance(is_manually_triggered=True)
-                    processed += 1
-                except Exception:
-                    errors += 1
-                    frappe.log_error(
-                        title=f"Auto attendance failed shift={s}",
-                        message=frappe.get_traceback(),
-                    )
-            details.update({
-                "mode": "all_shifts",
-                "total_shifts": len(shifts),
-            })
+        total = len(shifts)
+        # logger.debug(f"in run_auto_attendance_background total shift to process {total} ") 
         # ---------------------------------------
-        # ✅ UPDATE WATERMARK ONCE (CRITICAL FIX)
+        # MAIN LOOP
         # ---------------------------------------
-        # logger.debug(f"Updating last_repair_run_at to {repair_start} after processing {processed} shifts with {errors} errors")
+        for idx, shift_name in enumerate(shifts, start=1):
+            try:
+                doc = frappe.get_cached_doc("Shift Type", shift_name)                
+                doc.process_auto_attendance(is_manually_triggered=True)
+                processed += 1
+                # ✅ update progress
+                frappe.cache().set_value(CACHE_KEY_STATUS, {
+                    "status": "running",
+                    "processed": processed,
+                    "errors": errors,
+                    "total": total,
+                    "current_shift": shift_name,
+                    "progress": round((processed / total) * 100, 1)
+                })
+                frappe.db.commit()
+            except Exception:
+                errors += 1
+                tb = traceback.format_exc()
+                frappe.log_error(tb, f"Shift failed: {shift_name}")
+                # 🔥 CRITICAL: expose first error to UI
+                frappe.cache().set_value(CACHE_KEY_STATUS, {
+                    "status": "failed",
+                    "error": f"{shift_name}:\n{tb[:1500]}"
+                })
+                frappe.db.rollback()
+                return  # stop early for debugging
+        # ---------------------------------------
+        # UPDATE WATERMARK (ONCE ONLY)
+        # ---------------------------------------
         frappe.db.set_value(
             "VCM HR Settings",
             "VCM HR Settings",
@@ -1031,15 +1110,32 @@ def run_auto_attendance_now(employee: str | None = None):
             repair_start,
         )
         frappe.db.commit()
-        return {
-            "ok": errors == 0,
+        # ---------------------------------------
+        # FINAL STATUS
+        # ---------------------------------------
+        frappe.cache().set_value(CACHE_KEY_STATUS, {
+            "status": "completed" if errors == 0 else "failed",
             "processed": processed,
             "errors": errors,
-            "details": details,
-        }
+            "total": total,
+            "finished_at": str(now_datetime())
+        })
+        logger.debug(f"in run_auto_attendance_background processed {processed} errors {errors}, total {total} ") 
+    except Exception:
+        tb = traceback.format_exc()
+
+        frappe.log_error(tb, "Auto Attendance Background Fatal Error")
+
+        frappe.cache().set_value(CACHE_KEY_STATUS, {
+            "status": "failed",
+            "error": tb[:5000]  # truncate to avoid Redis overflow
+        })
     finally:
-        # safety unlock (if you use global flag)
-        frappe.flags.vcm_repair_running = False
+        frappe.cache().delete_value(CACHE_KEY_RUNNING)
+
+@frappe.whitelist()
+def get_auto_attendance_status():
+    return frappe.cache().get_value(CACHE_KEY_STATUS) or {}
 
 def date_range(start_date, end_date):
         start = getdate(start_date)

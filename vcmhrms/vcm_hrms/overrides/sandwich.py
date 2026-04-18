@@ -1,5 +1,7 @@
 # Copyright (c) 2026, Pankaj Sharma and contributors
 # For license information, please see license.txt
+import traceback
+
 import frappe
 from frappe.utils import getdate, nowdate, add_days, get_datetime, cint, flt, now_datetime, date_diff
 from vcmhrms.vcm_hrms.overrides.VCMShiftType import _unlink_day_checkins
@@ -12,77 +14,189 @@ SANDWICH_LEAVE_TYPE = "Sandwich Absent"
 # Night scheduler entry
 # ------------------------------------------------------------
 @frappe.whitelist()
-def run_sandwich_daily():
-    settings = frappe.get_cached_doc("VCM HR Settings")
-    locked_upto = getdate(settings.attendance_locked_upto) if settings.attendance_locked_upto else None
-    today = getdate(nowdate())
-    start = add_days(today, -5)   # safe default window if locked_upto is blank
-    if locked_upto:
-        start = add_days(locked_upto, 1)
-    if locked_upto and start <= locked_upto:
-        start = add_days(locked_upto, 1)
-    if start > today:
-        return {
-            "ok": True,
-            "processed": 0,
-            "created": 0,
-            "cleared": 0,
-            "skipped": "range fully locked"
-        }
-    return run_sandwich_policy(start, today)
+def run_sandwich_now():
+    if frappe.cache().get_value("sandwich_running"):
+        return {"already_running": True}
+    frappe.cache().set_value("sandwich_running", True)
+    frappe.enqueue(
+        "vcmhrms.vcm_hrms.overrides.sandwich.run_sandwich_background",
+        queue="long",
+        timeout=4000,
+        job_name="sandwich_run",
+        enqueue_after_commit=True
+    )
+    return {"queued": True}
 
+def run_sandwich_background(employee=None):
+    frappe.set_user("Administrator")
+    frappe.cache().set_value("sandwich_status", {
+        "status": "running",
+        "processed": 0,
+        "created": 0,
+        "cleared": 0
+    })
+    try:
+        settings = frappe.get_cached_doc("VCM HR Settings")
+        locked_upto = getdate(settings.attendance_locked_upto) if settings.attendance_locked_upto else None
+        today = getdate(nowdate())
+        # ----------------------------
+        # DATE WINDOW
+        # ----------------------------
+        start = add_days(today, -5)
+        if locked_upto:
+            start = add_days(locked_upto, 1)
+        if locked_upto and start <= locked_upto:
+            start = add_days(locked_upto, 1)
+        # ----------------------------
+        # FULLY LOCKED
+        # ----------------------------
+        if start > today:
+            frappe.cache().set_value("sandwich_status", {
+                "status": "completed",
+                "processed": 0,
+                "created": 0,
+                "cleared": 0,
+                "skipped": "range fully locked"
+            })
+            return
+        # ---------------------------------------
+        # CALL CORE LOGIC (MODIFIED BELOW)
+        # ---------------------------------------
+        result = run_sandwich_policy_background(start, today, employee)
+
+        # ----------------------------
+        # DEFENSIVE CHECK (CRITICAL FIX)
+        # ----------------------------
+        if not result:
+            frappe.cache().set_value("sandwich_status", {
+                "status": "failed",
+                "error": "Sandwich returned no result"
+            })
+            return
+
+        if not result.get("ok", True):
+            frappe.cache().set_value("sandwich_status", {
+                "status": "failed",
+                "error": result.get("error", "Unknown error")
+            })
+            return
+        # ----------------------------
+        # SUCCESS
+        # ----------------------------
+        frappe.cache().set_value("sandwich_status", {
+            "status": "completed",
+            "processed": result.get("processed", 0),
+            "created": result.get("created", 0),
+            "cleared": result.get("cleared", 0),
+            "scanned": result.get("scanned"),
+            "total": result.get("total")
+        })
+    except Exception:
+        tb = traceback.format_exc()
+        frappe.log_error(tb, "Sandwich Background Failed")
+        frappe.cache().set_value("sandwich_status", {
+            "status": "failed",
+            "error": tb[:1500]
+        })
+    finally:
+        frappe.cache().delete_value("sandwich_running")
 
 # ------------------------------------------------------------
 # Main  runner where we do everything in one go for an employee 
 # ------------------------------------------------------------
 @frappe.whitelist()
-def run_sandwich_policy(from_date=None, to_date=None, employee=None):
+def run_sandwich_policy_background(from_date=None, to_date=None, employee=None):
     """
     Optimized Sandwich Rule
-    If employee is Absent on both sides of a Holiday/WeeklyOff block,
-    then those Holiday/WeeklyOff dates become Absent.
-    Improvements:
-    - Only process employees with activity
-    - Skip employees without holidays
-    - Minimal attendance queries
     """
     to_date = getdate(to_date or nowdate())
     from_date = getdate(from_date)
-    # Respect attendance lock: never touch locked or earlier
+    # -----------------------------------
+    # LOCK HANDLING
+    # -----------------------------------
     settings = frappe.get_cached_doc("VCM HR Settings")
     locked_upto = getdate(settings.attendance_locked_upto) if getattr(settings, "attendance_locked_upto", None) else None
     if locked_upto and from_date <= locked_upto:
         from_date = add_days(locked_upto, 1)
     if locked_upto and to_date <= locked_upto:
         return {"ok": True, "skipped": "range fully locked"}
+    if from_date > to_date:
+        return {"ok": True, "skipped": "invalid date range"}
+    # -----------------------------------
+    # EMPLOYEE LIST
+    # -----------------------------------
     employees = [employee] if employee else frappe.get_all(
         "Employee",
         filters={"status": "Active"},
         pluck="name"
     )
+    total = len(employees)
     created = 0
     cleared = 0
-    # logger.debug(f"[run_sandwich_policy 1] y for {len(employees)} employees, from {from_date} to {to_date}, locked_upto={locked_upto}")
-    for emp in employees:
-        # Skip if employee has no holiday in this range
-        hol_dates = _get_holiday_dates_for_employee(emp, from_date, to_date)
-        if not hol_dates:
-            continue
-        # logger.debug(f"[run_sandwich_policy 1-1]  employees {emp}, holiday {hol_dates} ")
-        # Skip if employee has no shift assigned in this range
-        if not _has_shift_in_range(emp, from_date, to_date):
-            # logger.debug(f"[run_sandwich_policy 1-2]  No shift assigned employees {emp}, holiday {hol_dates} ")
-            continue
-        res = _run_sandwich_for_employee(emp, from_date, to_date, hol_dates)
-        created += res["created"]
-        cleared += res["cleared"]    
-    frappe.db.commit()
+    processed = 0
+    scanned = 0  # 👈 real progress
+    UPDATE_EVERY = 10  # reduce Redis load
+    # -----------------------------------
+    # MAIN LOOP
+    # -----------------------------------
+    for idx, emp in enumerate(employees, start=1):
+        scanned += 1
+        try:
+            # Skip if no holidays
+            hol_dates = _get_holiday_dates_for_employee(emp, from_date, to_date)
+            if not hol_dates:
+                continue
+            # Skip if no shift
+            if not _has_shift_in_range(emp, from_date, to_date):
+                continue
+            res = _run_sandwich_for_employee(emp, from_date, to_date, hol_dates)
+            created += res["created"]
+            cleared += res["cleared"]
+            processed += 1
+        except Exception:
+            tb = frappe.get_traceback()
+            frappe.log_error(tb, f"Sandwich failed for {emp}")
+            frappe.cache().set_value("sandwich_status", {
+                "status": "failed",
+                "error": f"{emp}\n{tb[:1000]}"
+            })
+            frappe.db.rollback()
+            return {
+                "ok": False,
+                "processed": processed,
+                "created": created,
+                "cleared": cleared,
+                "error": tb
+            }
+        # -----------------------------------
+        # BATCHED STATUS UPDATE
+        # -----------------------------------
+        if scanned % UPDATE_EVERY == 0 or scanned == total:
+            frappe.cache().set_value("sandwich_status", {
+                "status": "running",
+                "processed": processed,
+                "created": created,
+                "cleared": cleared,
+                "scanned": scanned,       # 👈 NEW
+                "total": total,
+                "current_employee": emp
+            })
+        frappe.db.commit()
+    # -----------------------------------
+    # FINAL RETURN
+    # -----------------------------------
     return {
         "ok": True,
-        "processed": created + cleared,
+        "processed": processed,
         "created": created,
-        "cleared": cleared
+        "cleared": cleared,
+        "scanned": scanned,
+        "total": total
     }
+
+@frappe.whitelist()
+def get_sandwich_status():
+    return frappe.cache().get_value("sandwich_status") or {}
 
 def _has_shift_in_range(employee, from_date, to_date):
     return frappe.db.sql("""
@@ -278,41 +392,44 @@ def _apply_sandwich_day(employee, date):
         ],
         as_dict=True
     )
-    # logger.debug(f"_apply_sandwich_day: Attendance for {employee} on {date}: {att}")
-    
+    # logger.debug(f"_apply_sandwich_day: Attendance for {employee} on {date}: {att}")    
     if att:        
         if att.status != "Absent":
             # Attendance exists but is not Absent, like half day, On leave etc
-            return 0
-        
+            return 0        
         # Must have shift to decide logic
         if not att.shift:
             return 0
         shift = frappe.get_cached_doc("Shift Type", att.shift)
         if not shift:
             return 0  # cannot decide → safest is skip sandwich
+        working_hours = flt(att.working_hours or 0) 
         # ------------------------------------------------------------
         # FLEXI vs NON-FLEXI handling
         # ------------------------------------------------------------ 
-        # FLEXI SHIFT LOGIC  
-        working_hours = flt(att.working_hours or 0)      
+        # FLEXI SHIFT LOGIC               
         if cint(getattr(shift, "custom_flexible_shift", 0)):
             if working_hours == 0:
                 return 0  # data not reliable yet
             # define half-day threshold (adjust if you store elsewhere)
             # fallback → derive from shift hours
+            # ✅ FIX: ALWAYS DEFINE FIRST
+            half_day_threshold = None
+            # try configured threshold
+            half_day_threshold = flt(getattr(shift, "working_hours_threshold_for_half_day", 0))
+            # fallback
             if not half_day_threshold:
                 total_hours = flt(getattr(shift, "working_hours", 0))
                 half_day_threshold = total_hours / 2 if total_hours else 0
-
-            if working_hours >= half_day_threshold:
+             # safety check
+            if half_day_threshold and working_hours >= half_day_threshold:
                 return 0  # worked enough → skip sandwich
-
+        # ------------------------------------------------------------
         # NON-FLEX SHIFT LOGIC
+        # ------------------------------------------------------------
         else:
             first_half = int(att.get("custom_first_half_done") or 0)
             second_half = int(att.get("custom_second_half_done") or 0)
-
             if first_half or second_half:
                 return 0
     # ------------------------------------------------------------
