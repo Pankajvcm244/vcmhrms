@@ -11,9 +11,9 @@ def get_allowed_payroll_users():
     # Optional: move to System Settings / doctype later
     return [
         "sahil.chitkara@vcm.org.in",
-        "teena.arora@vcm.org.in",
         "pankaj.sharma@vcm.org.in",
         "Administrator",
+        "teena.arora@vcm.org.in",
     ]
 
 def is_payroll_user(user=None):
