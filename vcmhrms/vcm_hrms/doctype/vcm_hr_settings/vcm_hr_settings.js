@@ -26,6 +26,9 @@ frappe.ui.form.on("VCM HR Settings", {
         if (!frappe.user.has_role("System Manager")) {
             frm.set_df_property("attendance_locked_upto", "read_only", 1);
         }
+        if (!frappe.user.has_role("System Manager")) {
+            frm.set_df_property("last_repair_run_at", "read_only", 1);
+        }
         update_repair_days_limit(frm);
         // -----------------------------
         // STATE

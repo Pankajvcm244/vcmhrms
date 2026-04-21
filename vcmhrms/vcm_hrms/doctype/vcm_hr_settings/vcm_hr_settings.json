@@ -31,8 +31,7 @@
   {
    "fieldname": "last_repair_run_at",
    "fieldtype": "Datetime",
-   "label": "Last Repair Run At",
-   "read_only": 1
+   "label": "Last Repair Run At"
   },
   {
    "default": "3",
@@ -48,7 +47,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-14 15:05:26.471859",
+ "modified": "2026-04-21 17:19:00.949098",
  "modified_by": "pankaj.sharma@vcm.org.in",
  "module": "VCM HRMS",
  "name": "VCM HR Settings",
