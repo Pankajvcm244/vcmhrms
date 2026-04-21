@@ -113,6 +113,7 @@ class VCMShiftType(HRMSShiftType):
                     "time": ("between", [get_datetime(effective_start), get_datetime(last_sync)]),
                     "offshift": 0,
                     "shift": self.name,
+                    "log_type": ["in", ["IN", "OUT"]]
                 },
                 order_by="employee,time",
                 limit_page_length=5000,
@@ -192,8 +193,9 @@ class VCMShiftType(HRMSShiftType):
                     "time": (">=", repair_floor),
                     "offshift": 0,
                     "shift": self.name,
+                    "log_type": ["in", ["IN", "OUT"]]  # safest explicit filter
                 },
-                fields=["employee", "time", "shift"],
+                fields=["employee", "time", "shift", "log_type"],
                 order_by="employee, time asc",
                 limit_page_length=5000,
             )
@@ -345,6 +347,7 @@ class VCMShiftType(HRMSShiftType):
                                 "shift": shift_name,
                                 "time": ("between", [start, end]),
                                 "offshift": 0,
+                                "log_type": ["in", ["IN", "OUT"]]
                             },
                             fields=["time"],
                             order_by="time asc"
