@@ -459,7 +459,7 @@ class VCMShiftType(HRMSShiftType):
                                         "in_time": att_doc.in_time,
                                         "out_time": att_doc.out_time,
                                         "working_hours": att_doc.working_hours,
-                                        "status": "Half Day",  # 🔥 FORCE
+                                        "status": "Half Day",  # FORCE
                                         "half_day_status": att_doc.half_day_status,
                                         "custom_late_entry_within_grace": att_doc.custom_late_entry_within_grace,
                                         "custom_first_half_done": att_doc.custom_first_half_done,
@@ -706,7 +706,7 @@ def run_late_grace_quota_background():
                     "error": f"{employee}:\n{tb[:1000]}"
                 })
                 frappe.db.rollback()
-                return  # fail fast (debug friendly)
+                continue  # fail fast (debug friendly)
         # -----------------------------------
         # FINAL STATUS
         # -----------------------------------
