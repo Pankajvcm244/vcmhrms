@@ -14,6 +14,18 @@ frappe.ui.form.on('Double Duty', {
                 }
             };
         });
+        frm.set_query("salary_component", function() {
+            return {
+                filters: {
+                    name: ["in", [
+                        "Arrear Basic",
+                        "Arrear Allowance",
+                        "Double Duty",
+                    ]]
+                    // custom_allow_in_advance_salary: 1
+                }
+            };
+        });
     },
 
     // Month → Auto Payroll Date (25)
@@ -39,6 +51,15 @@ frappe.ui.form.on('Double Duty', {
         frm.refresh_field("employee_details");
     },
 
+    salary_component: function(frm) {
+
+        if (!frm.doc.employee_details) return;
+
+        frm.doc.employee_details.forEach(row => {
+            update_gross_salary(frm, row);
+        });
+    },
+
     payroll_date: function(frm) {
         if (frm.doc.employee_details) {
             frm.doc.employee_details.forEach(row => {
@@ -55,41 +76,7 @@ frappe.ui.form.on('Double Duty Employee', {
     //  Employee select → fetch salary
     employee: function(frm, cdt, cdn) {
         let row = locals[cdt][cdn];
-        if (!row.employee) return;
-
-        // Step 1: Get latest Salary Structure Assignment
-        frappe.call({
-            method: "frappe.client.get_list",
-            args: {
-                doctype: "Salary Structure Assignment",
-                filters: {
-                    employee: row.employee,
-                    docstatus: 1
-                },
-                fields: ["salary_structure"],
-                order_by: "from_date desc",
-                limit_page_length: 1
-            },
-            callback: function(r) {
-                if (r.message && r.message.length > 0) {
-
-                    let salary_structure = r.message[0].salary_structure;
-
-                    // Step 2: Get Gross Salary
-                    frappe.db.get_value("Salary Structure", salary_structure, "custom_gross_salary")
-                        .then(res => {
-                            if (res.message) {
-
-                                row.gross_salary = res.message.custom_gross_salary || 0;
-
-                                frm.refresh_field("employee_details");
-
-                                calculate_amount(frm, cdt, cdn);
-                            }
-                        });
-                }
-            }
-        });
+        update_gross_salary(frm, row);
     },
 
     days: function(frm, cdt, cdn) {
@@ -128,4 +115,103 @@ function calculate_amount(frm, cdt, cdn) {
     row.amount = per_day * row.days;
 
     frm.refresh_field("employee_details");
+}
+
+
+
+
+
+
+
+
+//// Update Gross salary in child table when field value chnage
+function update_gross_salary(frm, row) {
+
+    if (!row.employee) return;
+
+    frappe.call({
+        method: "frappe.client.get_list",
+        args: {
+            doctype: "Salary Structure Assignment",
+            filters: {
+                employee: row.employee,
+                docstatus: 1
+            },
+            fields: ["salary_structure"],
+            order_by: "from_date desc",
+            limit_page_length: 1
+        },
+        callback: function(r) {
+            if (r.message && r.message.length > 0) {
+
+                let salary_structure = r.message[0].salary_structure;
+
+                frappe.call({
+                    method: "frappe.client.get",
+                    args: {
+                        doctype: "Salary Structure",
+                        name: salary_structure
+                    },
+                    callback: function(res) {
+                        if (res.message) {
+
+                            let doc = res.message;
+
+                            // MAIN LOGIC
+                            if (frm.doc.salary_component &&
+                                frm.doc.salary_component.toLowerCase().includes("arrear basic")) {
+
+                                let earnings = doc.earnings || [];
+
+                                let basic_row = earnings.find(e =>
+                                    e.salary_component &&
+                                    e.salary_component.toLowerCase().includes("basic")
+                                );
+
+                                row.gross_salary = basic_row ? basic_row.amount : 0;
+
+                            }
+                            else if (frm.doc.salary_component &&
+                                frm.doc.salary_component.toLowerCase().includes("arrear allowance")) {
+
+                                // ALL EXCEPT BASIC
+                                let earnings = doc.earnings || [];
+
+                                let total_allowance = 0;
+
+                                earnings.forEach(e => {
+                                    if (
+                                        e.salary_component &&
+                                        !e.salary_component.toLowerCase().includes("basic")
+                                    ) {
+                                        total_allowance += (e.amount || 0);
+                                    }
+                                });
+
+                                row.gross_salary = total_allowance;
+
+                            }
+
+                            else if (frm.doc.salary_component &&
+                                frm.doc.salary_component.toLowerCase().includes("double duty")) {
+
+                                    row.gross_salary = doc.custom_gross_salary || 0;
+                            }
+
+                            else {
+                                 frappe.throw(
+                                    __("Invalid Salary Component selected. Please choose a valid option.")
+                                  );
+                            }
+
+                            // IMPORTANT: set via frappe.model
+                            frappe.model.set_value(row.doctype, row.name, "gross_salary", row.gross_salary);
+
+                            calculate_amount(frm, row.doctype, row.name);
+                        }
+                    }
+                });
+            }
+        }
+    });
 }

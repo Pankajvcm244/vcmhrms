@@ -13,7 +13,8 @@
   "salary_component",
   "month",
   "section_break_bvvr",
-  "employee_details"
+  "employee_details",
+  "connections_tab"
  ],
  "fields": [
   {
@@ -39,7 +40,6 @@
    "reqd": 1
   },
   {
-   "default": "Double Duty",
    "fieldname": "salary_component",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -75,13 +75,24 @@
    "fieldtype": "Select",
    "label": "Month",
    "options": "\nJan\nFeb\nMar\nApr\nMay\nJun\nJul\nAug\nSep\nOct\nNov\nDec"
+  },
+  {
+   "fieldname": "connections_tab",
+   "fieldtype": "Tab Break",
+   "label": "Connections",
+   "show_dashboard": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [],
- "modified": "2026-03-18 15:52:07.728226",
+ "links": [
+  {
+   "link_doctype": "Additional Salary",
+   "link_fieldname": "ref_docname"
+  }
+ ],
+ "modified": "2026-04-24 17:33:03.095187",
  "modified_by": "Administrator",
  "module": "VCM HRMS",
  "name": "Double Duty",

@@ -98,3 +98,18 @@ def get_employee_holiday_list(employee):
     holiday_list = core_get_holiday_list(employee)
 
     return holiday_list
+
+
+
+@frappe.whitelist()
+def download_salary_slip_pdf(name):
+    from frappe.utils.pdf import get_pdf
+
+    doc = frappe.get_doc("Salary Slip", name)
+
+    html = frappe.get_print("Salary Slip", name)
+    pdf = get_pdf(html)
+
+    frappe.response.filename = f"{name}.pdf"
+    frappe.response.filecontent = pdf
+    frappe.response.type = "download"
