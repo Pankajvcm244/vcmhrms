@@ -1,3 +1,7 @@
+# Copyright (c) 2026, Pankaj Sharma
+# For license information, please see license.txt
+
+
 # vcmhrms/vcm_hrms/overrides/salary_slip.py
 import frappe
 from vcmhrms.vcm_hrms.utilities.access_guard import validate_payroll_access

@@ -1,3 +1,8 @@
+
+# Copyright (c) 2026, Pankaj Sharma
+# For license information, please see license.txt
+
+
 import frappe
 from frappe.utils import get_datetime
 from vcmhrms.vcm_hrms.overrides.VCMShiftType import _attendance_date_for_punch

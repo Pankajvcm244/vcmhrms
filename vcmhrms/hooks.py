@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Pankaj Sharma
+# For license information, please see license.txt
+
 app_name = "vcmhrms"
 app_title = "VCM HRMS"
 app_publisher = "Pankaj Sharma"
@@ -119,15 +122,37 @@ app_license = "mit"
 
 permission_query_conditions = {
     "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Salary Detail": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Salary Structure": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Salary Structure Assignment": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Additional Salary": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Employee Incentive": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Retention Bonus": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Payroll Entry": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
-    "Salary Structure": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Payroll Employee Detail": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Employee Tax Exemption Declaration": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Employee Tax Exemption Proof Submission": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Employee Benefit Application": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
 }
-# #
-# has_permission = {
-#     "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.has_permission"
-# }
+
+
+has_permission = {
+    "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Salary Detail": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Salary Structure": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Salary Structure Assignment": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Additional Salary": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Employee Incentive": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Retention Bonus": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Payroll Entry": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Payroll Employee Detail": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Employee Tax Exemption Declaration": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Employee Tax Exemption Proof Submission": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Employee Benefit Application": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+    "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
+}
+
 
 # DocType Class
 # ---------------
@@ -215,6 +240,9 @@ doc_events = {
 # override_whitelisted_methods = {
 # 	"frappe.desk.doctype.event.event.get_events": "vcmhrms.event.get_events"
 # }
+override_whitelisted_methods = {
+    "frappe.desk.query_report.run": "vcmhrms.vcm_hrms.utilities.payroll_report_guard.run",
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,

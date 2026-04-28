@@ -1,5 +1,7 @@
-# Copyright (c) 2026, Pankaj Sharma and contributors
+# Copyright (c) 2026, Pankaj Sharma
 # For license information, please see license.txt
+
+
 
 import frappe
 from frappe.utils import get_datetime, getdate, add_days, flt, cint, nowdate
