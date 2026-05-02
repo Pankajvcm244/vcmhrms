@@ -21,12 +21,12 @@ CONFIDENTIAL_PAYROLL_REPORTS = {
     "Bank Remittance",
 }
 CONFIDENTIAL_PAYROLL_DOCTYPES = {
-    "Salary Slip",
+    "Additional Salary",
+    "Salary Slip",   
     "Salary Detail",
     "Salary Structure",
-    "Salary Structure Assignment",
-    "Additional Salary",
-    "Employee Incentive",
+    "Salary Structure Assignment",   
+    
     "Retention Bonus",
     "Payroll Entry",
     "Payroll Employee Detail",
@@ -34,6 +34,8 @@ CONFIDENTIAL_PAYROLL_DOCTYPES = {
     "Employee Tax Exemption Proof Submission",
     "Employee Benefit Application",
     "Employee Benefit Claim",
+    "Employee Advance",
+    "Employee Incentive",
 }
 
 def get_allowed_payroll_users():
