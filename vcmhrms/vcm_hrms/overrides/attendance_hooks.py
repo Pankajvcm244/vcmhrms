@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, time as pytime
 import logging
 logger = logging.getLogger(__name__)
 
+CHECKIN_ON_TIME_GRACE_MINUTES = 2
+
 def _to_time(t):
     """Shift start/end sometimes come as time / timedelta / string. Normalize to datetime.time."""
     if t is None:
@@ -347,9 +349,24 @@ def apply_nonflex_strict_hours(doc, method=None):
         lunch_end = lunch_start + timedelta(minutes=30)
 
     # ----------------------------
+    # Check-in on-time grace policy
+    # ----------------------------
+    # Example:
+    # Shift start = 09:30
+    # 09:30:00 to 09:31:59 = on time
+    # 09:32:00 onwards = late
+    on_time_grace_minutes = CHECKIN_ON_TIME_GRACE_MINUTES
+    policy_late_start = strict_start + timedelta(minutes=on_time_grace_minutes)
+    # ----------------------------
     # Clamp working hours (strict)
     # ----------------------------
-    eff_in = max(in_dt, strict_start)
+    # If employee is within free on-time grace, count work from strict_start.
+    # This prevents 09:31 from losing working minutes / first-half completion.
+    if in_dt < policy_late_start:
+        eff_in = strict_start
+    else:
+        eff_in = max(in_dt, strict_start)
+
     eff_out = min(out_dt, strict_end)
     seconds = max(0, (eff_out - eff_in).total_seconds())
     wh = flt(seconds / 3600.0, 2)
@@ -367,19 +384,22 @@ def apply_nonflex_strict_hours(doc, method=None):
     # Your quota is ONLY for "late but within grace"
     if cint(getattr(shift, "enable_late_entry_marking", 0) or 0):
         late_grace = cint(getattr(shift, "late_entry_grace_period", 0) or 0)
-        grace_cutoff = strict_start + timedelta(minutes=late_grace)       
-        # Only compute within_grace, DO NOT overwrite if already set
-        computed_within_grace = 1 if (in_dt > strict_start and in_dt <= grace_cutoff) else 0
+        # Existing HRMS late grace cutoff remains from strict shift start.
+        # Example: if late_entry_grace_period = 30,
+        # cutoff remains 10:00 for a 09:30 shift.
+        grace_cutoff = strict_start + timedelta(minutes=late_grace) 
+        # Free on-time grace:
+        # 09:30:00 to 09:31:59 = NOT late
+        # 09:32:00 onwards = late
+        computed_within_grace = 1 if (
+            in_dt >= policy_late_start and in_dt <= grace_cutoff
+        ) else 0     
         existing_flag = cint(getattr(doc, "custom_late_entry_within_grace", 0) or 0)
         # quota is source of truth
-        final_flag =existing_flag
+        final_flag = existing_flag
         doc.custom_late_entry_within_grace = final_flag
-        # logger.debug(
-        #     f"[apply_nonflex_strict_hours 4] within_grace={computed_within_grace} for {doc.name}: "
-        #     f"in_dt={in_dt} strict_start={strict_start} grace_cutoff={grace_cutoff}"
-        # )
-        # keep a general late flag (useful for reporting; policy should use within_grace)
-        doc.late_entry = 1 if (in_dt > strict_start) else 0
+        # General late flag
+        doc.late_entry = 1 if (in_dt >= policy_late_start) else 0
         # logger.debug(
         #     f"[ATT-CLAMP 4] late_entry={doc.late_entry} for {doc.name}: "
         #     f"in_dt={in_dt} strict_start={strict_start}"

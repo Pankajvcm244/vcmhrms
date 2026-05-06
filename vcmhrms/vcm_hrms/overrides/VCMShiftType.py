@@ -9,7 +9,13 @@ import logging
 import random
 from datetime import datetime, timedelta, time as pytime
 from hrms.hr.doctype.shift_type.shift_type import ShiftType as HRMSShiftType
-from vcmhrms.vcm_hrms.overrides.attendance_hooks import apply_flex_min_hours, apply_nonflex_strict_hours, _strict_shift_bounds_and_lunch, _payroll_period_for_date
+from vcmhrms.vcm_hrms.overrides.attendance_hooks import (
+    apply_flex_min_hours, 
+    apply_nonflex_strict_hours, 
+    _strict_shift_bounds_and_lunch, 
+    _payroll_period_for_date, 
+    CHECKIN_ON_TIME_GRACE_MINUTES,
+)
 logger = logging.getLogger(__name__)
 SANDWICH_LEAVE_TYPE = "Sandwich Absent"
 
@@ -651,8 +657,12 @@ def run_late_grace_quota_background():
                     )
                     if not strict_start:
                         continue
+                    on_time_grace_minutes = CHECKIN_ON_TIME_GRACE_MINUTES
+                    policy_late_start = strict_start + timedelta(minutes=on_time_grace_minutes)
+
                     grace_cutoff = strict_start + timedelta(minutes=late_grace)
-                    if in_dt > strict_start and in_dt <= grace_cutoff:
+
+                    if in_dt >= policy_late_start and in_dt <= grace_cutoff:
                         eligible.append({
                             "name": r.name,
                             "attendance_date": r.attendance_date
