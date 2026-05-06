@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 CONFIDENTIAL_PAYROLL_USERS = {
     "teena.arora@vcm.org.in",
-    "sahil.chitkara@vcm.org.in",
+    # "sahil.chitkara@vcm.org.in",
     "pankaj.sharma@vcm.org.in",
     "Administrator",
 }
