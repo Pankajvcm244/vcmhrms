@@ -222,6 +222,35 @@ frappe.ui.form.on("VCM HR Settings", {
                 }
             );
         });
+        frm.add_custom_button(__("Delete All Attendance"), function () {
+            frappe.confirm(
+                __(
+                    "This will delete ALL Attendance records and unlink Employee Checkins.<br><br>" +
+                    "<b>Use only in testing.</b><br>" +
+                    "This action cannot be undone.<br><br>" +
+                    "Do you want to continue?"
+                ),
+                function () {
+                    frappe.call({
+                        method: "vcmhrms.vcm_hrms.doctype.vcm_hr_settings.vcm_hr_settings.enqueue_delete_all_attendance",
+                        freeze: true,
+                        freeze_message: __("Starting attendance cleanup..."),
+                        callback: function (r) {
+                            if (!r.exc) {
+                                frappe.show_alert({
+                                    message: __("Attendance deletion started in background."),
+                                    indicator: "orange"
+                                });
+
+                                poll_delete_all_attendance_status(frm);
+                            }
+                        }
+                    });
+                }
+            );
+        }).addClass("btn-danger");
+
+        poll_delete_all_attendance_status(frm);
     }, // end of refresh
     attendance_locked_upto(frm) {
         update_repair_days_limit(frm);
@@ -509,4 +538,51 @@ function enforce_repair_days_limit(frm) {
         });
         frm.set_value("repair_window_days", frm._max_repair_days);
     }
+}
+
+function poll_delete_all_attendance_status(frm) {
+    if (frm.__delete_all_attendance_polling) {
+        return;
+    }
+
+    frm.__delete_all_attendance_polling = true;
+
+    const poll = function () {
+        frappe.call({
+            method: "vcmhrms.vcm_hrms.doctype.vcm_hr_settings.vcm_hr_settings.get_delete_all_attendance_status",
+            callback: function (r) {
+                const status = r.message || {};
+
+                if (status.status) {
+                    let indicator = "blue";
+
+                    if (status.status === "Completed") {
+                        indicator = "green";
+                    } else if (status.status === "Failed") {
+                        indicator = "red";
+                    } else if (status.status === "Running") {
+                        indicator = "orange";
+                    }
+
+                    frm.dashboard.clear_headline();
+
+                    frm.dashboard.set_headline_alert(
+                        `<b>Delete All Attendance:</b> ${frappe.utils.escape_html(status.message || status.status)}`,
+                        indicator
+                    );
+                }
+
+                if (status.status === "Queued" || status.status === "Running") {
+                    setTimeout(poll, 3000);
+                } else {
+                    frm.__delete_all_attendance_polling = false;
+                }
+            },
+            error: function () {
+                frm.__delete_all_attendance_polling = false;
+            }
+        });
+    };
+
+    poll();
 }
