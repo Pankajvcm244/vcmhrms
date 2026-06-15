@@ -120,6 +120,7 @@ app_license = "mit"
 # -----------
 # Permissions evaluated in scripted ways
 
+# controls lists/searches.
 permission_query_conditions = {
     "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Salary Detail": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
@@ -134,9 +135,10 @@ permission_query_conditions = {
     "Employee Tax Exemption Proof Submission": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Application": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Employee": "vcmhrms.vcm_hrms.utilities.access_guard.employee_permission_query",
 }
 
-
+# blocks direct URL/form/API access.
 has_permission = {
     "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
     "Salary Detail": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",

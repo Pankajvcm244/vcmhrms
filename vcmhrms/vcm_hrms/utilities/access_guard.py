@@ -7,7 +7,6 @@ import logging
 logger = logging.getLogger(__name__)
 CONFIDENTIAL_PAYROLL_USERS = {
     "teena.arora@vcm.org.in",
-    "sahil.chitkara@vcm.org.in",
     "pankaj.sharma@vcm.org.in",
     "Administrator",
 }
@@ -26,8 +25,7 @@ CONFIDENTIAL_PAYROLL_DOCTYPES = {
     "Salary Slip",   
     "Salary Detail",
     "Salary Structure",
-    "Salary Structure Assignment",   
-    
+    "Salary Structure Assignment", 
     "Retention Bonus",
     "Payroll Entry",
     "Payroll Employee Detail",
@@ -37,6 +35,12 @@ CONFIDENTIAL_PAYROLL_DOCTYPES = {
     "Employee Benefit Claim",
     "Employee Advance",
     "Employee Incentive",
+}
+
+EMPLOYEE_FULL_ACCESS_ROLES = {
+    "HR Manager",
+    "HR User",
+    "System Manager",
 }
 
 def get_allowed_payroll_users():
@@ -59,7 +63,7 @@ def validate_payroll_access(user=None):
             "You are not authorized to access confidential  payroll data.",
             frappe.PermissionError
         )
-
+# controls lists/searches.
 def payroll_permissions_query_conditions(user):
     # logger.debug(f"in payroll_permissions_query_conditions   user={user}")
     """
@@ -70,7 +74,8 @@ def payroll_permissions_query_conditions(user):
         return "1=0"
     return ""
 
-def has_confidential_payroll_permission(doc, user=None, permission_type=None):
+# blocks direct URL/form/API access.
+def has_confidential_payroll_permission(doc, user=None, ptype=None, **kwargs):
     """
     Blocks form open/read/print/email/export access.
     """
@@ -78,3 +83,25 @@ def has_confidential_payroll_permission(doc, user=None, permission_type=None):
     if is_payroll_user(user):
         return True
     return False
+
+def has_full_employee_access(user=None):
+    user = user or frappe.session.user
+    if user == "Administrator":
+        return True
+    return bool(
+        EMPLOYEE_FULL_ACCESS_ROLES.intersection(frappe.get_roles(user))
+    )
+
+def employee_permission_query(user=None):
+    user = user or frappe.session.user
+    if has_full_employee_access(user):
+        return ""
+    escaped_user = frappe.db.escape(user)
+    return f"`tabEmployee`.`user_id` = {escaped_user}"
+
+
+def has_employee_permission(doc, user=None, ptype=None, **kwargs):
+    user = user or frappe.session.user
+    if has_full_employee_access(user):
+        return True
+    return doc.user_id == user
