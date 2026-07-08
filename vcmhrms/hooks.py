@@ -135,7 +135,7 @@ permission_query_conditions = {
     "Employee Tax Exemption Proof Submission": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Application": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
-    "Employee": "vcmhrms.vcm_hrms.utilities.access_guard.employee_permission_query",
+    # "Employee": "vcmhrms.vcm_hrms.utilities.access_guard.employee_permission_query",
 }
 
 # blocks direct URL/form/API access.

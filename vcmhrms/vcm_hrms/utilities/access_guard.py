@@ -36,12 +36,12 @@ CONFIDENTIAL_PAYROLL_DOCTYPES = {
     "Employee Advance",
     "Employee Incentive",
 }
-
-EMPLOYEE_FULL_ACCESS_ROLES = {
-    "HR Manager",
-    "HR User",
-    "System Manager",
-}
+# Now w ewill tag user in employee to set user permission.
+# EMPLOYEE_FULL_ACCESS_ROLES = {
+#     "HR Manager",
+#     "HR User",
+#     "System Manager",
+# }
 
 def get_allowed_payroll_users():
     # logger.debug(f"in get_allowed_payroll_users ")
@@ -84,20 +84,20 @@ def has_confidential_payroll_permission(doc, user=None, ptype=None, **kwargs):
         return True
     return False
 
-def has_full_employee_access(user=None):
-    user = user or frappe.session.user
-    if user == "Administrator":
-        return True
-    return bool(
-        EMPLOYEE_FULL_ACCESS_ROLES.intersection(frappe.get_roles(user))
-    )
+# def has_full_employee_access(user=None):
+#     user = user or frappe.session.user
+#     if user == "Administrator":
+#         return True
+#     return bool(
+#         EMPLOYEE_FULL_ACCESS_ROLES.intersection(frappe.get_roles(user))
+#     )
 
-def employee_permission_query(user=None):
-    user = user or frappe.session.user
-    if has_full_employee_access(user):
-        return ""
-    escaped_user = frappe.db.escape(user)
-    return f"`tabEmployee`.`user_id` = {escaped_user}"
+# def employee_permission_query(user=None):
+#     user = user or frappe.session.user
+#     if has_full_employee_access(user):
+#         return ""
+#     escaped_user = frappe.db.escape(user)
+#     return f"`tabEmployee`.`user_id` = {escaped_user}"
 
 
 def has_employee_permission(doc, user=None, ptype=None, **kwargs):
