@@ -1,5 +1,6 @@
-"""SmartOffice adapter: POST JSON {punches: [...], synced_through: optional ISO timestamp}."""
+"""Biometric adapter: POST JSON with Staff ID, Biometric Code and offset-aware punch time."""
 from datetime import datetime
+from hashlib import sha256
 from zoneinfo import ZoneInfo
 import frappe
 from frappe.utils import get_datetime, now_datetime, getdate, add_days
@@ -32,14 +33,19 @@ def ingest_payload(payload, simulated=False):
         savepoint=f'workforce_{index}'
         frappe.db.savepoint(savepoint)
         try:
-            event_id=str(row.get('event_id') or '').strip()
-            person_id=str(row.get('person_id') or '').strip()
-            if not event_id or len(event_id)>140 or not person_id:
-                frappe.throw('event_id and person_id are required; event_id maximum 140 characters.')
-            worker=frappe.db.get_value('Temp Worker',{'smartoffice_id':person_id},'name')
-            if not worker: frappe.throw('Unknown SmartOffice person_id; register worker and retry.')
+            staff_id=str(row.get('staff_id') or '').strip()
+            biometric_code=str(row.get('biometric_code') or '').strip()
+            if not staff_id or not biometric_code or not row.get('punch_time'):
+                frappe.throw('staff_id, biometric_code and punch_time are required.')
+            worker=frappe.db.get_value('Temp Worker',
+                {'staff_id':staff_id,'smartoffice_id':biometric_code},'name')
+            if not worker:
+                frappe.throw('Staff ID and Biometric Code do not identify the same Temp Worker.')
             time=timestamp(row.get('punch_time'))
             if time>now_datetime(): frappe.throw('Future punch not accepted.')
+            # Stable internal event identity makes provider retries idempotent without
+            # requiring the provider to understand or supply an event ID.
+            event_id='BIO-'+sha256(f'{staff_id}|{biometric_code}|{time.isoformat()}'.encode()).hexdigest()[:40]
             existing=frappe.db.get_value('Temp Punch',{'event_id':event_id},['name','worker','punch_time'],as_dict=True)
             if existing:
                 if existing.worker!=worker or get_datetime(existing.punch_time)!=time:
@@ -49,7 +55,7 @@ def ingest_payload(payload, simulated=False):
             person=frappe.get_doc('Temp Worker',worker)
             if getdate(time)<getdate(person.active_from) or (person.active_until and getdate(time)>getdate(person.active_until)):
                 frappe.throw('Punch falls outside worker engagement dates.')
-            doc=frappe.get_doc(dict(doctype='Temp Punch',event_id=event_id,worker=worker,
+            doc=frappe.get_doc(dict(doctype='Temp Punch',event_id=event_id,worker=worker,staff_id=person.staff_id,
                 punch_time=time,device_id=row.get('device_id'),source_location=row.get('location'),received_at=now_datetime(),
                 is_simulated=int(simulated)))
             doc.flags.workforce_ingestion=True
@@ -59,16 +65,7 @@ def ingest_payload(payload, simulated=False):
             frappe.db.rollback(save_point=savepoint)
             results.append(dict(row=index+1,status='failed',message=str(error)))
     failed=any(r['status']=='failed' for r in results)
-    if payload.get('synced_through') and not failed:
-        value=timestamp(payload['synced_through'])
-        if value>now_datetime(): frappe.throw('Sync watermark cannot be in the future.')
-        # Lock one persisted setting so simultaneous batches cannot move the watermark backwards.
-        frappe.db.sql('select name from `tabDefaultValue` where defkey=%s for update',
-                      'temp_worker_synced_through')
-        old=frappe.db.get_default('temp_worker_synced_through')
-        if not old or value>get_datetime(old):
-            frappe.db.set_default('temp_worker_synced_through',str(value))
-    # Recalculate all open rosters when watermark advances; delayed historical punches also recalculate.
+    # Delayed historical punches are accepted and recalculate attendance automatically.
     frappe.enqueue('vcmhrms.temp_worker.api.recalculate_all',enqueue_after_commit=True)
     return dict(success=not failed,results=results)
 
@@ -76,3 +73,22 @@ def ingest_payload(payload, simulated=False):
 def recalculate_all():
     for name in frappe.get_all('Temp Roster',pluck='name'):
         recalculate(frappe.get_doc('Temp Roster',name))
+
+
+def finalize_pending_attendance():
+    """Hourly fallback finalizes duties whose capture windows have closed, including no-punch absences."""
+    rows=frappe.db.sql('''select distinct a.roster
+        from `tabTemp Attendance` a
+        join `tabTemp Attendance Duty` d on d.parent=a.name
+        join `tabTemp Roster Duty` rd on rd.name=d.roster_duty
+        join `tabTemp Shift` s on s.name=rd.shift
+        where d.status='Pending'
+          and timestampadd(minute,
+                greatest(coalesce(rd.planned_after_ot_hours,0),coalesce(s.max_after_ot_capture_hours,0))*60
+                    + coalesce(s.late_minutes,0),rd.end_datetime)<=%s
+        limit 2000''',now_datetime(),as_dict=True)
+    for row in rows:
+        try:
+            recalculate(frappe.get_doc('Temp Roster',row.roster))
+        except Exception:
+            frappe.log_error(frappe.get_traceback(),f'Temp Attendance finalization failed: {row.roster}')

@@ -41,7 +41,9 @@ def calculate(duties, punches, now, synced_through=None):
         low, high = windows[index]
         matched = sorted(set(p for p in punches if low <= p <= high))
         ambiguous = any(sum(a <= p <= b for a, b in windows) > 1 for p in matched)
-        complete = synced_through is not None and synced_through >= high and now >= high
+        # Finalize by the configured capture-window closing time. A delayed historical
+        # punch is still accepted later and causes recalculation of the affected result.
+        complete = now >= high
         result = dict(roster_duty=duty['id'], shift=duty['shift'], first_in=None,
                       last_out=None, worked_hours=0, actual_before_ot_hours=0,
                       actual_after_ot_hours=0,

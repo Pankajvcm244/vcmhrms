@@ -6,6 +6,9 @@ Temp Punch is a technical immutable event store. A separate event table is
 deliberate: unique event IDs, concurrent retries, unrostered punches, and cross-midnight
 matching are safer than editing a growing child table on a calendar-day attendance record.
 
+Share [Temp Attendance Guide](TEMP_ATTENDANCE_GUIDE.md) with HR, supervisors, testers, and the
+biometric integration team for status codes, synchronization, calculation, OT, and review behavior.
+
 ## Installation in the existing vcmhrms app
 
 1. Copy `vcmhrms/temp_worker/` into your app package.
@@ -21,6 +24,42 @@ matching are safer than editing a growing child table on a calendar-day attendan
    Forms are available through Desk search. Workspace/dashboard layout remains pending team input.
 
 ## SmartOffice API
+
+## Manual tester UI
+
+After migration, open `/app/temp-punch-simulator` (also accessible from a Temp Roster form).
+Only System Manager and ERP Manager can use this page; Integration role and API credentials
+are not required for a signed-in tester. Non-System Managers still need Branch User Permissions.
+
+1. Create the workers, shifts and duty rosters before submitting punches.
+2. Select ONE Temp Worker. Add multiple rows in Punch Times, including timestamps across dates.
+   Example: 5 Oct 22:00, 6 Oct 06:00, 6 Oct 22:00, 7 Oct 06:00 for two night duties.
+3. Generate Sample optionally appends Day, Night or Multiple Duties times for a chosen date.
+4. Build Preview checks timestamps and generates event IDs. Submit Test Punches automatically
+   builds this preview if needed, then submits all timestamps for the selected worker.
+5. Optional Advanced JSON upload/editor must contain only that selected worker's SmartOffice ID.
+   After editing JSON, click Preview JSON to use JSON mode. Download JSON supports sharing tests.
+6. Submit shows per-row created/duplicate/failed results. Open Punch Log to inspect saved events.
+   Attendance recalculates in the background; authorized roster editors can also recalculate manually.
+
+ERP Manager receives read access to the module masters and punch log. Assign Branch User
+Permissions for permitted locations; ordinary Temp Worker Manager/Supervisor cannot use the simulator.
+Both Page roles and server methods enforce this restriction, including direct API calls.
+
+Generated scenarios assume Day 09:00–18:00 with 60-minute unpaid break, Night 22:00–06:00 without
+break, and separate Morning 06:00–10:00 / Evening 14:00–18:00 duties without breaks. The offset
+defaults to +05:30; choose the correct source offset and matching roster dates.
+
+Every simulated event is marked `is_simulated=1`. Events remain immutable and affect actual
+attendance records, so use an isolated staging site. Keep event IDs unchanged to test duplicates;
+generate a new sample for a fresh scenario. Simulated events and normal SmartOffice events share
+the same event-ID uniqueness constraints and ingestion/calculation logic.
+
+Global sync completeness is NOT advanced by default, even when JSON includes synced_through.
+Only System Manager can explicitly enable this checkbox. It advances the same global watermark
+as SmartOffice and can finalize all eligible rosters. Without completeness, results may be Pending.
+
+## API contract
 
 POST `/api/method/vcmhrms.temp_worker.api.receive_punches`
 
@@ -49,6 +88,12 @@ The queue recalculates all rosters after a batch in this first small-scale relea
 
 ## Calculation and scope
 
+- Temp Worker has two separate identifiers: manually entered `Staff ID` for the organization and
+  `SmartOffice ID` for biometric/API matching. They are never substituted for one another. New
+  document IDs use `TW-YYMM-xxxxx`; existing IDs remain unchanged after migration. Existing workers
+  receive a `LEGACY-<old worker ID>` Staff ID placeholder that HR must replace with the real Staff ID.
+- New attendance IDs use `TEMPATT-<Staff ID>-YYMMDD-xx`. New punch IDs use
+  `TempPunch-<Staff ID>-YYMMDD-xx`. Existing attendance and punch IDs remain unchanged.
 - Roster duty start/end datetimes support overnight and multiple shifts. Date means duty-start date.
 - First/last punch within a window infer IN/OUT. Break minutes are subtracted once per duty.
 - Flexy uses explicit per-day start/end attendance windows and required hours. This release does
@@ -57,15 +102,43 @@ The queue recalculates all rosters after a batch in this first small-scale relea
   hours; the system does not invent a boundary punch or split continuous hours.
 - Single punch is Needs Review. Absent is calculated only after shift windows and sync completeness.
 - No government holiday calendar is consulted. Weekly off is explicit in roster.
-- Monthly page shows Monday–Sunday weekly-off warnings for complete weeks inside the selected
-  month. They are advisory, not a publishing gate; cross-month and partial-engagement weeks need
-  supervisor review. Confirm the business week definition before enforcing publication.
 - Bulk allocation replaces a worker's existing duty rows in the selected range with one shift or off.
   Add multiple duties through the daily roster form.
-- OT is only calculated extra hours; approval requires manager role and review notes. There is no
-  payroll posting or automatic approval. Approved OT is a daily total, not one value per duty.
+- Each roster duty can plan before-shift OT and after-shift OT separately, with a mandatory reason.
+  Each shift also defines maximum before/after OT capture hours (default 4). This lets actual OT
+  exceed planned OT while retaining the planned-versus-actual difference. Actual OT is the time from first punch to scheduled
+  start and scheduled end to last punch. Values are calculated independently for every duty.
+- Where broad capture windows from adjacent duties overlap, matching boundaries are split at the
+  midpoint between duties. A punch exactly on a shared boundary remains Needs Review.
+- Each shift has late-entry and early-exit grace minutes, default 15. First punch later than shift
+  start plus grace is flagged Late Entry; last punch earlier than shift end minus grace is flagged
+  Early Exit. Exactly 15 minutes is within grace.
+- Final status uses worked hours (first to last punch minus configured break): required hours or more
+  is Present; from half the required hours up to the requirement is Half Day; less than half is Absent.
+- `/app/attend-review-page` is the manager dashboard for missing punches, Half Day, Absent, Late
+  Entry and Early Exit. Managers see only their assigned workers; System Manager is backup. A manager
+  can record a corrected IN/OUT pair or override status with a mandatory reason. Raw punches remain
+  unchanged; correction login/time/reason are stored, and recalculation resets affected approvals.
+  The manager may also approve the calculated punch exception as-is. Punch review stores approver,
+  timestamp and remarks. Normal Present attendance is marked Not Required and never enters this queue.
+- Temp Worker Manager or System Manager may approve before/after OT up to its actual value and must
+  enter review notes. Changed punch calculations reset approvals. There is no payroll posting or
+  automatic approval. Existing pilot `planned_ot_hours` values migrate to planned after-shift OT.
+- Bulk approval is available at `/app/temp-ot-approval`. A Temp Worker Manager sees and approves only
+  workers whose Temp Worker `supervisor` equals their current User. The server repeats this ownership
+  check for every selected row; branch permissions also apply. System Manager is the backup approver
+  and can handle all workers when the assigned supervisor is unavailable.
+  Actions support approve planned, approve actual, custom values and reject, all with mandatory remarks.
+  Approved and rejected rows are immutable and show approver login ID, approval timestamp and remarks.
+- A duty with no planned or actual OT is marked Not Required, so it never appears as pending OT.
+- `Temp Monthly Attendance` is the payout review matrix. Each worker is one row and each date shows
+  P, HD, A, OFF or NR, plus late/early and pending approval markers. Totals include paid-duty units
+  (Present + 0.5 × Half Day), worked hours, approved OT and unresolved review counts. Weekly offs are
+  counted separately so the organization can apply its own paid-weekly-off policy before payout.
+  Its month filter uses `MM-YYYY`. System Manager can leave Manager blank for all workers or select
+  one manager; a Temp Worker Manager is always restricted to workers assigned to their own login.
 - Roster edits recalculate affected adjacent days. Historical reports reference current roster;
-  Frappe track_changes preserves change history. No approval/finalization workflow yet.
+  Frappe track_changes preserves change history.
 - Weekly-off punches are flagged for review; replacement off/OT treatment is not automatic.
 - Raw punches cannot be edited/deleted through ordinary document operations.
 - Separate punch log list captures unrostered events; they are processed when a roster is added.
@@ -73,6 +146,7 @@ The queue recalculates all rosters after a batch in this first small-scale relea
 
 ## Validation before production
 
+Simulator boundary tests cover roles, one-worker batches, branches, watermark restrictions, future dates and multi-date overnight input.
 Local pure engine tests cover overnight, missing punches, pending sync, boundary ambiguity,
 separated multiple shifts, duplicate timestamps, breaks and OT. Python/JSON/JS syntax is checked.
 No live Frappe bench was available during development. On staging, verify migration, roles,

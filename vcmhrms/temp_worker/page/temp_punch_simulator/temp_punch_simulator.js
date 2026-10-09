@@ -17,8 +17,6 @@ frappe.pages['temp-punch-simulator'].on_page_load = function(wrapper) {
     const upload = $('<input type="file" accept=".json,application/json" aria-label="Select punch JSON file">').appendTo(controls);
     const editor = frappe.ui.form.make_control({parent:advanced,df:{fieldname:'payload',label:'Punch JSON',fieldtype:'Code',options:'JSON'},render_input:true});
     editor.set_value(JSON.stringify({punches:[]},null,2));
-    const finalize = frappe.ui.form.make_control({parent:container,df:{fieldname:'finalize',label:'Advance global sync completeness using synced_through (System Manager only)',fieldtype:'Check',default:0},render_input:true});
-    container.append('<p class="text-muted">Leave this unchecked to test punches without finalizing attendance. Checked advances completeness for ALL locations; use only on an isolated staging site.</p>');
     const preview = $('<div style="overflow:auto"></div>').appendTo(container);
     const output = $('<div class="mt-3" style="overflow:auto"></div>').appendTo(container);
     let busy=false;
@@ -30,15 +28,15 @@ frappe.pages['temp-punch-simulator'].on_page_load = function(wrapper) {
             frappe.throw(__('JSON must contain between 1 and 500 punches.'));
         }
         for (const row of payload.punches) {
-            if (!row || typeof row!=='object' || Array.isArray(row) || !row.event_id || !row.person_id || !row.punch_time) {
-                frappe.throw(__('Each punch requires event_id, person_id and punch_time.'));
+            if (!row || typeof row!=='object' || Array.isArray(row) || !row.staff_id || !row.biometric_code || !row.punch_time) {
+                frappe.throw(__('Each punch requires Staff ID, Biometric Code and Punch Time.'));
             }
         }
         return payload;
     }
     function renderPreview(payload) {
-        preview.html(`<h5>${payload.punches.length} punches to submit</h5><table class="table table-bordered"><thead><tr><th>Event ID</th><th>SmartOffice ID</th><th>Timestamp</th><th>Device</th><th>Location</th></tr></thead><tbody>`+
-            payload.punches.map(row=>'<tr>'+[row.event_id,row.person_id,row.punch_time,row.device_id,row.location].map(v=>`<td>${esc(v)}</td>`).join('')+'</tr>').join('')+'</tbody></table>');
+        preview.html(`<h5>${payload.punches.length} punches to submit</h5><table class="table table-bordered"><thead><tr><th>Staff ID</th><th>Biometric Code</th><th>Timestamp</th><th>Device</th><th>Location</th></tr></thead><tbody>`+
+            payload.punches.map(row=>'<tr>'+[row.staff_id,row.biometric_code,row.punch_time,row.device_id,row.location].map(v=>`<td>${esc(v)}</td>`).join('')+'</tr>').join('')+'</tbody></table>');
     }
     let inputMode='table', builtSignature='';
     async function buildPreview() {
@@ -62,7 +60,7 @@ frappe.pages['temp-punch-simulator'].on_page_load = function(wrapper) {
         editor.set_value(JSON.stringify({punches:[]},null,2));
         times.df.data=[]; times.grid.refresh();
         inputMode='table'; builtSignature='';
-        preview.empty(); output.empty(); finalize.set_value(0);
+        preview.empty(); output.empty();
     });
     upload.on('change',async function() {
         const file=this.files[0];
@@ -98,7 +96,7 @@ frappe.pages['temp-punch-simulator'].on_page_load = function(wrapper) {
             times.grid.refresh();
             inputMode='table'; builtSignature='';
             editor.set_value(JSON.stringify({punches:[]},null,2));
-            preview.empty(); output.empty(); finalize.set_value(0);
+            preview.empty(); output.empty();
             dialog.hide();
         }});
         dialog.show();
@@ -112,7 +110,7 @@ frappe.pages['temp-punch-simulator'].on_page_load = function(wrapper) {
             if (inputMode==='table') await buildPreview();
             const payload=parse();
             renderPreview(payload);
-            const {message:result}=await frappe.call({method:'vcmhrms.temp_worker.simulator.submit_sample',args:{payload:JSON.stringify(payload),worker:worker.get_value(),finalize:finalize.get_value()?1:0},freeze:true,freeze_message:__('Submitting simulated punches…')});
+            const {message:result}=await frappe.call({method:'vcmhrms.temp_worker.simulator.submit_sample',args:{payload:JSON.stringify(payload),worker:worker.get_value()},freeze:true,freeze_message:__('Submitting simulated punches…')});
             const counts={created:0,duplicate:0,failed:0};
             result.results.forEach(row=>{counts[row.status]=(counts[row.status]||0)+1;});
             output.html(`<h5>Created: ${counts.created} · Duplicates: ${counts.duplicate} · Failed: ${counts.failed}</h5><table class="table table-bordered"><thead><tr><th>Event / Row</th><th>Status</th><th>Message</th></tr></thead><tbody>`+

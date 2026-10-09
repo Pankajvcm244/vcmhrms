@@ -17,7 +17,7 @@ frappe.query_reports['Temp Monthly Attendance'] = {
         if (!column.fieldname.startsWith('day_')) return value;
         const raw=String(data[column.fieldname] || '');
         if (raw.startsWith('A') || raw.startsWith('NR')) return `<span style="color:#c0392b;font-weight:600">${value}</span>`;
-        if (raw.startsWith('HD') || raw.includes('!')) return `<span style="color:#b7791f;font-weight:600">${value}</span>`;
+        if (raw.startsWith('HD') || raw.startsWith('PD') || raw.includes('!')) return `<span style="color:#b7791f;font-weight:600">${value}</span>`;
         if (raw.startsWith('P')) return `<span style="color:#26734d">${value}</span>`;
         return value;
     }

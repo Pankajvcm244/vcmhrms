@@ -135,6 +135,10 @@ permission_query_conditions = {
     "Employee Tax Exemption Proof Submission": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Application": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
+    "Temp Worker": "vcmhrms.temp_worker.permissions.worker_query",
+    "Temp Roster": "vcmhrms.temp_worker.permissions.roster_query",
+    "Temp Attendance": "vcmhrms.temp_worker.permissions.attendance_query",
+    "Temp Punch": "vcmhrms.temp_worker.permissions.punch_query",
     # "Employee": "vcmhrms.vcm_hrms.utilities.access_guard.employee_permission_query",
 }
 
@@ -155,6 +159,17 @@ has_permission = {
     "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
 }
 
+has_permission.update({
+    name: "vcmhrms.temp_worker.permissions.has_permission"
+    for name in (
+        "Temp Worker",
+        "Temp Roster",
+        "Temp Attendance",
+        "Temp Punch",
+    )
+})
+
+after_migrate = ["vcmhrms.temp_worker.setup.after_migrate"]
 
 # DocType Class
 # ---------------
@@ -212,7 +227,11 @@ doc_events = {
 
 # Scheduled Tasks
 # ---------------
-
+scheduler_events = {
+    "hourly": [
+        "vcmhrms.temp_worker.api.finalize_pending_attendance"
+    ]
+}
 # scheduler_events = {
 # 	"all": [
 # 		"vcmhrms.tasks.all"

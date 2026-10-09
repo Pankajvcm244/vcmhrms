@@ -14,7 +14,8 @@ def _system_manager():
 
 def _day_status(items):
     statuses=[item.status or 'Pending' for item in items]
-    if any(status in ('Pending','Needs Review') for status in statuses): return 'NR'
+    if any(status=='Needs Review' for status in statuses): return 'NR'
+    if any(status=='Pending' for status in statuses): return 'PD'
     if all(status=='Present' for status in statuses): return 'P'
     if all(status=='Absent' for status in statuses): return 'A'
     return 'HD'
@@ -142,7 +143,7 @@ def execute(filters=None):
             row[f'day_{day}']=f'{code}{flags}{marker}{ot}'
         for field in ('pay_units','worked_hours','approved_ot'): row[field]=round(row[field],2)
         data.append(row)
-    message=('Legend: P Present, HD Half Day, A Absent, OFF Weekly Off, NR Needs Review, '
+    message=('Legend: P Present, HD Half Day, A Absent, OFF Weekly Off, PD Pending, NR Needs Review, '
              'L Late, E Early, ! punch approval pending, OT? OT approval pending. '
              'Paid Duty Units = Present + 0.5 × Half Day; weekly offs are shown separately.')
     return columns,data,message
