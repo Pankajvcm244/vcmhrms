@@ -1,0 +1,259 @@
+{
+  "doctype": "DocType",
+  "name": "Temp Attendance Duty",
+  "module": "Temp Worker",
+  "engine": "InnoDB",
+  "istable": 1,
+  "track_changes": 0,
+  "fields": [
+    {
+      "fieldname": "roster_duty",
+      "label": "Roster Duty",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "shift",
+      "label": "Shift",
+      "fieldtype": "Link",
+      "read_only": 1,
+      "in_list_view": 1,
+      "options": "Temp Shift"
+    },
+    {
+      "fieldname": "first_in",
+      "label": "First In",
+      "fieldtype": "Datetime",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "last_out",
+      "label": "Last Out",
+      "fieldtype": "Datetime",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "worked_hours",
+      "label": "Worked Hours",
+      "fieldtype": "Float",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "required_hours",
+      "label": "Required Hours",
+      "fieldtype": "Float",
+      "read_only": 1
+    },
+    {
+      "fieldname": "shortfall_hours",
+      "label": "Shortfall Hours",
+      "fieldtype": "Float",
+      "read_only": 1
+    },
+    {
+      "fieldname": "late_entry",
+      "label": "Late Entry",
+      "fieldtype": "Check",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "early_exit",
+      "label": "Early Exit",
+      "fieldtype": "Check",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "actual_before_ot_hours",
+      "label": "Actual Before OT",
+      "fieldtype": "Float",
+      "read_only": 1
+    },
+    {
+      "fieldname": "planned_before_ot_hours",
+      "label": "Planned Before OT",
+      "fieldtype": "Float",
+      "read_only": 1
+    },
+    {
+      "fieldname": "actual_after_ot_hours",
+      "label": "Actual After OT",
+      "fieldtype": "Float",
+      "read_only": 1
+    },
+    {
+      "fieldname": "planned_after_ot_hours",
+      "label": "Planned After OT",
+      "fieldtype": "Float",
+      "read_only": 1
+    },
+    {
+      "fieldname": "approved_before_ot_hours",
+      "label": "Approved Before OT",
+      "fieldtype": "Float",
+      "default": 0
+    },
+    {
+      "fieldname": "approved_after_ot_hours",
+      "label": "Approved After OT",
+      "fieldtype": "Float",
+      "default": 0
+    },
+    {
+      "fieldname": "ot_reason",
+      "label": "Planned OT Reason",
+      "fieldtype": "Small Text",
+      "read_only": 1
+    },
+    {
+      "fieldname": "ot_approval_status",
+      "label": "OT Approval Status",
+      "fieldtype": "Select",
+      "options": "Not Required\nPending\nApproved\nRejected",
+      "default": "Not Required",
+      "read_only": 1
+    },
+    {
+      "fieldname": "approved_by",
+      "label": "Approved By",
+      "fieldtype": "Link",
+      "options": "User",
+      "read_only": 1
+    },
+    {
+      "fieldname": "approved_at",
+      "label": "Approved At",
+      "fieldtype": "Datetime",
+      "read_only": 1
+    },
+    {
+      "fieldname": "approval_remarks",
+      "label": "Approval Remarks",
+      "fieldtype": "Small Text",
+      "read_only": 1
+    },
+    {
+      "fieldname": "punch_approval_status",
+      "label": "Punch Approval Status",
+      "fieldtype": "Select",
+      "options": "Not Required\nPending\nApproved",
+      "default": "Not Required",
+      "read_only": 1
+    },
+    {
+      "fieldname": "punch_approved_by",
+      "label": "Punch Approved By",
+      "fieldtype": "Link",
+      "options": "User",
+      "read_only": 1
+    },
+    {
+      "fieldname": "punch_approved_at",
+      "label": "Punch Approved At",
+      "fieldtype": "Datetime",
+      "read_only": 1
+    },
+    {
+      "fieldname": "punch_approval_remarks",
+      "label": "Punch Approval Remarks",
+      "fieldtype": "Small Text",
+      "read_only": 1
+    },
+    {
+      "fieldname": "corrected_first_in",
+      "label": "Corrected First In",
+      "fieldtype": "Datetime",
+      "read_only": 1
+    },
+    {
+      "fieldname": "corrected_last_out",
+      "label": "Corrected Last Out",
+      "fieldtype": "Datetime",
+      "read_only": 1
+    },
+    {
+      "fieldname": "status_override",
+      "label": "Status Override",
+      "fieldtype": "Select",
+      "options": "\nPresent\nHalf Day\nAbsent",
+      "read_only": 1
+    },
+    {
+      "fieldname": "exception_reason",
+      "label": "Attendance Exception Reason",
+      "fieldtype": "Small Text",
+      "read_only": 1
+    },
+    {
+      "fieldname": "exception_by",
+      "label": "Exception By",
+      "fieldtype": "Link",
+      "options": "User",
+      "read_only": 1
+    },
+    {
+      "fieldname": "exception_at",
+      "label": "Exception At",
+      "fieldtype": "Datetime",
+      "read_only": 1
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "read_only": 1,
+      "in_list_view": 1,
+      "options": "Pending\nPresent\nHalf Day\nAbsent\nNeeds Review"
+    },
+    {
+      "fieldname": "exception",
+      "label": "Exception",
+      "fieldtype": "Small Text",
+      "read_only": 1
+    }
+  ],
+  "field_order": [
+    "roster_duty",
+    "shift",
+    "first_in",
+    "last_out",
+    "worked_hours",
+    "required_hours",
+    "shortfall_hours",
+    "late_entry",
+    "early_exit",
+    "planned_before_ot_hours",
+    "actual_before_ot_hours",
+    "approved_before_ot_hours",
+    "planned_after_ot_hours",
+    "actual_after_ot_hours",
+    "approved_after_ot_hours",
+    "ot_reason",
+    "ot_approval_status",
+    "approved_by",
+    "approved_at",
+    "approval_remarks",
+    "punch_approval_status",
+    "punch_approved_by",
+    "punch_approved_at",
+    "punch_approval_remarks",
+    "corrected_first_in",
+    "corrected_last_out",
+    "status_override",
+    "exception_reason",
+    "exception_by",
+    "exception_at",
+    "status",
+    "exception"
+  ],
+  "permissions": [],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "actions": [],
+  "links": [],
+  "states": []
+}

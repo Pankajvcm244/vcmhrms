@@ -1,0 +1,6 @@
+{
+  "doctype": "Page", "name": "temp-monthly-roster",
+  "page_name": "temp-monthly-roster", "title": "Temp Monthly Roster",
+  "module": "Temp Worker", "standard": "Yes",
+  "roles": [{"role": "System Manager"}, {"role": "Temp Worker Manager"}, {"role": "Temp Worker Supervisor"}]
+}

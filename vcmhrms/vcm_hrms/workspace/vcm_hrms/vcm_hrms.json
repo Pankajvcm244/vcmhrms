@@ -1,0 +1,216 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"D1O264D5xQ\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">VCM Regular Employees (within HR)</span>\",\"col\":12}},{\"id\":\"p1fSipOHLO\",\"type\":\"card\",\"data\":{\"card_name\":\"HRMS Documents\",\"col\":4}},{\"id\":\"9CSs-qL3H5\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"sWSrjS8mI8\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Temporary Person/Staff attendence (Not with HR)</b></span>\",\"col\":12}},{\"id\":\"CoaUFG1Zhs\",\"type\":\"card\",\"data\":{\"card_name\":\"Temp Staff Manager Actions\",\"col\":4}},{\"id\":\"nXTizmCEEf\",\"type\":\"card\",\"data\":{\"card_name\":\"Temp Worker\",\"col\":4}},{\"id\":\"qk3tDw6dMK\",\"type\":\"card\",\"data\":{\"card_name\":\"Temp Reports\",\"col\":4}}]",
+ "creation": "2026-10-08 12:52:52.720776",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "share-people",
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "VCM HRMS",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "HRMS Documents",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Advance Salary",
+   "link_count": 0,
+   "link_to": "Advance Salary",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Double Duty",
+   "link_count": 0,
+   "link_to": "Double Duty",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Special Concession",
+   "link_count": 0,
+   "link_to": "Special Concession",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "VCM HR Settings",
+   "link_count": 0,
+   "link_to": "VCM HR Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Temp Staff Manager Actions",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Monthly Roster to assign shifts",
+   "link_count": 0,
+   "link_to": "temp-monthly-roster",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Monthly Attendance review",
+   "link_count": 0,
+   "link_to": "Temp Monthly Attendance",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Mispunch Review",
+   "link_count": 0,
+   "link_to": "attend-review-page",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "OT Approval",
+   "link_count": 0,
+   "link_to": "temp-ot-approval",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Temp Reports",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Roster vs Attendence",
+   "link_count": 0,
+   "link_to": "Temp Roster vs Attendance",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Temp Worker",
+   "link_count": 6,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Temp Worker",
+   "link_count": 0,
+   "link_to": "Temp Worker",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Temp Shift",
+   "link_count": 0,
+   "link_to": "Temp Shift",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Temp Roster",
+   "link_count": 0,
+   "link_to": "Temp Roster",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Temp Punch",
+   "link_count": 0,
+   "link_to": "Temp Punch",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Temp Attendance",
+   "link_count": 0,
+   "link_to": "Temp Attendance",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Punch Simulator",
+   "link_count": 0,
+   "link_to": "temp-punch-simulator",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-09 16:31:58.964832",
+ "modified_by": "Administrator",
+ "module": "VCM HRMS",
+ "name": "VCM HRMS",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 58.2,
+ "shortcuts": [],
+ "title": "VCM HRMS"
+}
