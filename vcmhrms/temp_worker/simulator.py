@@ -55,5 +55,4 @@ def submit_sample(payload, worker):
                 str(row.get('biometric_code') or '').strip()!=doc.smartoffice_id):
             frappe.throw('Every punch must contain the selected worker Staff ID and Biometric Code.')
     payload=dict(payload)
-    payload.pop('synced_through',None)
     return ingest_payload(payload,simulated=True)

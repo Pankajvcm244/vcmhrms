@@ -48,6 +48,11 @@ frappe.pages['attend-review-page'].on_page_load=function(wrapper) {
             dialog.hide(); frappe.show_alert('Attendance corrected and recalculated.'); await load();
         }});dialog.show();
     }
+    page.add_inner_button(__('Finalize Pending'),async()=>{
+        const {message}=await frappe.call({method:'vcmhrms.temp_worker.api.run_pending_finalization',type:'POST',freeze:true});
+        frappe.msgprint(__(`Found ${message.found}; recalculated ${message.recalculated}; failed ${message.failed}.`));
+        await load();
+    });
     page.set_primary_action(__('Load Exceptions'),load);
     load();
 };

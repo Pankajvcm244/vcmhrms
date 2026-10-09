@@ -43,7 +43,9 @@ Code, and Punch Time. This keeps integration simple and allows an older punch to
 
 ERPNext finalizes a duty when the current time passes its complete capture window. The window includes
 the scheduled shift, early/late matching allowance, and configured before/after-shift OT capture hours.
-An hourly scheduler finalizes pending duties, including Absent days with no punches.
+The scheduler runs at 04:00 for eligible day/evening duties and at 16:00 for night duties that end in
+the morning, including their after-shift capture window. These runs also finalize Absent days with no
+punches. Managers can run the same calculation immediately from **Temp Attendance Review > Finalize Pending**.
 
 ### Example
 
@@ -53,7 +55,7 @@ An hourly scheduler finalizes pending duties, including Absent days with no punc
 - Additional late matching allowance: **30 minutes**
 - Capture window closes: **02-10-2026 04:30**
 
-Attendance stays **PD — Pending** until 04:30. After 04:30, the hourly job automatically finalizes it
+Attendance stays **PD — Pending** until 04:30. The 16:00 job automatically finalizes it
 as Present, Half Day, Absent, or Needs Review.
 
 If an old punch arrives later, the API accepts it and queues recalculation. Attendance may change from
@@ -125,7 +127,8 @@ Additional markers:
 
 **PD is a timing state.** Punch data may be correct, but the configured capture window is still open.
 
-The hourly scheduler finalizes it after the window closes; manager action is normally unnecessary.
+The next scheduled 04:00 or 16:00 run finalizes it after the window closes. A manager can use **Finalize Pending**
+when the result is needed before the next scheduled run.
 
 
 

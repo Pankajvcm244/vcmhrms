@@ -85,7 +85,7 @@ def recalculate_rosters(roster_names):
 
 
 def finalize_pending_attendance():
-    """Hourly fallback finalizes duties whose capture windows have closed, including no-punch absences."""
+    """Finalize duties whose capture windows have closed, including no-punch absences."""
     rows=frappe.db.sql('''select distinct a.roster
         from `tabTemp Attendance` a
         join `tabTemp Attendance Duty` d on d.parent=a.name
@@ -96,8 +96,21 @@ def finalize_pending_attendance():
                 greatest(coalesce(rd.planned_after_ot_hours,0),coalesce(s.max_after_ot_capture_hours,0))*60
                     + coalesce(s.late_minutes,0),rd.end_datetime)<=%s
         limit 2000''',now_datetime(),as_dict=True)
+    recalculated=0
+    failed=0
     for row in rows:
         try:
             recalculate(frappe.get_doc('Temp Roster',row.roster))
+            recalculated+=1
         except Exception:
+            failed+=1
             frappe.log_error(frappe.get_traceback(),f'Temp Attendance finalization failed: {row.roster}')
+    return dict(found=len(rows),recalculated=recalculated,failed=failed)
+
+
+@frappe.whitelist(methods=['POST'])
+def run_pending_finalization():
+    """Manual test/operations trigger; the same function also runs daily at 04:00 and 16:00."""
+    if frappe.session.user=='Guest' or not ({'System Manager','Temp Worker Manager'} & set(frappe.get_roles())):
+        frappe.throw('Temp Worker Manager or System Manager role required.',frappe.PermissionError)
+    return finalize_pending_attendance()

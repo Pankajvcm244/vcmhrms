@@ -9,6 +9,7 @@ def evaluate_times(result,duty,first,last,complete=True):
         return result
     hours=max(0,(last-first).total_seconds()/3600-duty['break_minutes']/60)
     required=float(duty['required_hours'])
+    half_day=float(duty.get('half_day_hours') or required/2)
     before_ot=max(0,(duty['start']-first).total_seconds()/3600)
     after_ot=max(0,(last-duty['end']).total_seconds()/3600)
     result.update(first_in=first,last_out=last,worked_hours=round(hours,2),required_hours=required,
@@ -17,11 +18,11 @@ def evaluate_times(result,duty,first,last,complete=True):
         early_exit=int(last<duty['end']-timedelta(minutes=duty.get('early_exit_grace_minutes',15))),
         actual_before_ot_hours=round(before_ot,2),actual_after_ot_hours=round(after_ot,2))
     if complete:
-        result['status']='Present' if hours>=required else 'Half Day' if hours>=required/2 else 'Absent'
+        result['status']='Present' if hours>=required else 'Half Day' if hours>=half_day else 'Absent'
     return result
 
 
-def calculate(duties, punches, now, synced_through=None):
+def calculate(duties, punches, now):
     results = []
     windows = [(d['start'] - timedelta(hours=max(d.get('planned_before_ot_hours', 0),
                                                    d.get('max_before_ot_capture_hours', 0)), minutes=d['early']),

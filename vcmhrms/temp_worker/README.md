@@ -56,8 +56,10 @@ generate a new sample for a fresh scenario. Simulated events and normal SmartOff
 the same event-ID uniqueness constraints and ingestion/calculation logic.
 
 Attendance finalizes automatically after each duty's complete punch and OT capture window closes.
-An hourly scheduler finalizes Pending records. Delayed historical punches remain accepted and trigger
-recalculation, so the simulator does not require a synchronization-completeness control.
+A scheduler at 04:00 finalizes eligible day/evening records, and another run at 16:00 handles night
+shifts ending in the morning, including their configured after-shift capture window. Managers can run
+the same process from **Temp Attendance Review > Finalize Pending** for testing or an operational recheck. Delayed
+historical punches remain accepted and recalculate only nearby rosters for that worker.
 
 ## API contract
 
@@ -81,8 +83,8 @@ event ID internally, so retrying an unchanged punch is idempotent.
 Timestamp offsets are mandatory; stored timestamps use the site's timezone.
 API returns per-event created/duplicate/failed outcomes. Retry failed rows; unchanged event IDs
 are idempotent. Conflicting event IDs are rejected. Unknown workers must be registered then retried.
-Without a confirmed watermark, results remain Pending; never infer absence from an offline feed.
-The queue recalculates all rosters after a batch in this first small-scale release.
+The provider does not send a synchronization watermark. Each newly accepted punch queues recalculation
+only for that worker's nearby roster dates, including adjacent dates needed for overnight duties.
 
 ## Calculation and scope
 
@@ -91,7 +93,7 @@ The queue recalculates all rosters after a batch in this first small-scale relea
   document IDs use `TW-YYMM-xxxxx`; existing IDs remain unchanged after migration. Existing workers
   receive a `LEGACY-<old worker ID>` Staff ID placeholder that HR must replace with the real Staff ID.
 - New attendance IDs use `TEMPATT-YYMM-xxxxxx`. New punch IDs use
-  `TempPunch-<Staff ID>-YYMMDD-xx`. Temp Attendance does not duplicate Staff ID; it retains Worker
+  `TempPunch-YYMMDD-xxxxxx`; Staff ID is stored as a field and is not part of the document ID. Temp Attendance does not duplicate Staff ID; it retains Worker
   Code and the Worker Name link. Existing attendance and punch IDs remain unchanged.
 - New roster IDs use `TEMPROST-YYMM-xxxxx`, where YYMM comes from the roster date. Existing roster
   IDs remain unchanged.
@@ -115,7 +117,8 @@ The queue recalculates all rosters after a batch in this first small-scale relea
   start plus grace is flagged Late Entry; last punch earlier than shift end minus grace is flagged
   Early Exit. Exactly 15 minutes is within grace.
 - Final status uses worked hours (first to last punch minus configured break): required hours or more
-  is Present; from half the required hours up to the requirement is Half Day; less than half is Absent.
+  is Present; from the shift's configured Half Day Hours up to the requirement is Half Day; less than
+  the configured Half Day Hours is Absent. When Half Day Hours is zero, half the required hours is used.
 - `/app/attend-review-page` is the manager dashboard for missing punches, Half Day, Absent, Late
   Entry and Early Exit. Managers see only their assigned workers; System Manager is backup. A manager
   can record a corrected IN/OUT pair or override status with a mandatory reason. Raw punches remain
@@ -147,7 +150,7 @@ The queue recalculates all rosters after a batch in this first small-scale relea
 
 ## Validation before production
 
-Simulator boundary tests cover roles, one-worker batches, branches, watermark restrictions, future dates and multi-date overnight input.
+Simulator boundary tests cover roles, one-worker batches, branches, future dates and multi-date overnight input.
 Local pure engine tests cover overnight, missing punches, open capture windows, boundary ambiguity,
 separated multiple shifts, duplicate timestamps, breaks and OT. Python/JSON/JS syntax is checked.
 No live Frappe bench was available during development. On staging, verify migration, roles,
