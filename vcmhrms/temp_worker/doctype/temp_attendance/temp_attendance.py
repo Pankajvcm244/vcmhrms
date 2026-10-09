@@ -7,11 +7,10 @@ from vcmhrms.temp_worker.service import check_branch
 
 class TempAttendance(Document):
     def autoname(self):
-        staff_id=self.staff_id or frappe.db.get_value('Temp Worker',self.worker,'staff_id')
-        if not staff_id or not self.attendance_date:
-            frappe.throw('Staff ID and Attendance Date are required for naming.')
-        self.staff_id=staff_id
-        self.name=make_autoname(f'TEMPATT-{staff_id}-{frappe.utils.getdate(self.attendance_date):%y%m%d}-.##')
+        if not self.attendance_date:
+            frappe.throw('Attendance Date is required for naming.')
+        month=frappe.utils.getdate(self.attendance_date).strftime('%y%m')
+        self.name=make_autoname(f'TEMPATT-{month}-.######')
 
     def validate(self):
         if self.flags.workforce_calculation: return
@@ -20,7 +19,7 @@ class TempAttendance(Document):
         check_branch(roster.branch)
         if self.is_new(): frappe.throw('Use Recalculate on the roster to create attendance.')
         old=self.get_doc_before_save()
-        if old and any(self.get(f)!=old.get(f) for f in ['roster','worker','worker_code','staff_id',
+        if old and any(self.get(f)!=old.get(f) for f in ['roster','worker','worker_code',
                                                           'attendance_date','late_entry','early_exit',
                                                           'worked_hours','calculated_at']):
             frappe.throw('Calculated attendance fields cannot be changed manually.')

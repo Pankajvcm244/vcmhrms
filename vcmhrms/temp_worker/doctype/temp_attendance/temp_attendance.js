@@ -2,7 +2,8 @@ frappe.ui.form.on('Temp Attendance', {
     refresh(frm) {
         if (frappe.user_roles.includes('System Manager') || frappe.user_roles.includes('Temp Worker Manager')) {
             frm.add_custom_button(__('Bulk OT Approval'), () => frappe.set_route('temp-ot-approval'));
-            frm.add_custom_button(__('Attendance Review'), () => frappe.set_route('temp-attendance-review'));
+            frm.add_custom_button(__('Attendance Review'), () => frappe.set_route('attend-review-page'));
+            frm.add_custom_button(__('Monthly Attendance'), () => frappe.set_route('query-report', 'Temp Monthly Attendance'));
         }
         if (!frm.doc.roster) return;
         frm.add_custom_button(__('Open Roster'), () => frappe.set_route('Form', 'Temp Roster', frm.doc.roster));

@@ -1,11 +1,17 @@
 from frappe.model.document import Document
 import frappe
 from datetime import timedelta
+from frappe.model.naming import make_autoname
 from frappe.utils import get_datetime, getdate, add_days
 from vcmhrms.temp_worker.service import check_branch, recalculate
 
 
 class TempRoster(Document):
+    def autoname(self):
+        if not self.roster_date:
+            frappe.throw('Roster Date is required for naming.')
+        self.name=make_autoname(f'TEMPROST-{getdate(self.roster_date):%y%m}-.#####')
+
     def validate(self):
         check_branch(self.branch)
         old=self.get_doc_before_save()
@@ -13,6 +19,7 @@ class TempRoster(Document):
             frappe.throw('Worker and roster date cannot change after creation; edit the duty allocations instead.')
         worker=frappe.get_doc('Temp Worker',self.worker)
         worker.check_permission('read')
+        self.staff_id=worker.staff_id
         date=getdate(self.roster_date)
         if date<getdate(worker.active_from) or (worker.active_until and date>getdate(worker.active_until)):
             frappe.throw('Roster date falls outside engagement dates.')

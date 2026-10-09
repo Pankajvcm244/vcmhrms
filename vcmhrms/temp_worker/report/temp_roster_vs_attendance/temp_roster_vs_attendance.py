@@ -8,7 +8,8 @@ def execute(filters=None):
     if not filters.branch or not filters.from_date or not filters.to_date:
         frappe.throw('Branch and date range are required.')
     check_branch(filters.branch)
-    specs=[('worker_name','Worker','Data',None),('worker','Worker ID','Link','Temp Worker'),('date','Date','Date',None),
+    specs=[('worker_name','Worker','Data',None),('worker','Worker ID','Link','Temp Worker'),
+        ('staff_id','Staff ID','Data',None),('date','Date','Date',None),
         ('day_type','Duty / Off','Data',None),('shift','Shift','Data',None),('planned_start','Planned Start','Datetime',None),
         ('planned_end','Planned End','Datetime',None),('first_in','Inferred IN','Datetime',None),
         ('last_out','Inferred OUT','Datetime',None),('worked_hours','Hours','Float',None),
@@ -30,8 +31,9 @@ def execute(filters=None):
         name=frappe.db.get_value('Temp Attendance',{'roster':roster.name})
         attendance=frappe.get_doc('Temp Attendance',name) if name else None
         results={r.roster_duty:r for r in attendance.results} if attendance else {}
-        worker_name=frappe.db.get_value('Temp Worker',roster.worker,'worker_name') or roster.worker
-        base=dict(worker_name=worker_name,worker=roster.worker,date=roster.roster_date,day_type=roster.day_type)
+        worker_data=frappe.db.get_value('Temp Worker',roster.worker,['worker_name','staff_id'],as_dict=True) or {}
+        base=dict(worker_name=worker_data.get('worker_name') or roster.worker,worker=roster.worker,
+                  staff_id=worker_data.get('staff_id'),date=roster.roster_date,day_type=roster.day_type)
         last_duty_date=max((getdate(duty.end_datetime) for duty in roster.duties),default=getdate(roster.roster_date))
         punch_end=add_days(max(last_duty_date,getdate(roster.roster_date)),1)
         raw_punches=frappe.get_all('Temp Punch',filters={'worker':roster.worker,

@@ -51,11 +51,11 @@ def recalculate(roster):
                 max_after_ot_capture_hours=shift.max_after_ot_capture_hours or 0,
                 late_entry_grace_minutes=shift.late_entry_grace_minutes or 0,
                 early_exit_grace_minutes=shift.early_exit_grace_minutes or 0))
-    watermark=frappe.db.get_default('temp_worker_synced_through')
-    results=calculate(duties,punches,now_datetime(),get_datetime(watermark) if watermark else None)
+    results=calculate(duties,punches,now_datetime())
     name=frappe.db.get_value('Temp Attendance',{'roster':roster.name})
     doc=frappe.get_doc('Temp Attendance',name) if name else frappe.new_doc('Temp Attendance')
-    doc.update(dict(roster=roster.name,worker=roster.worker,attendance_date=roster.roster_date,
+    doc.update(dict(roster=roster.name,worker=roster.worker,worker_code=roster.worker,
+                    attendance_date=roster.roster_date,
                     calculated_at=now_datetime()))
     current_results=results[:len(roster.duties)]
     old_exceptions={r.roster_duty:dict(corrected_first_in=r.corrected_first_in,
@@ -76,6 +76,9 @@ def recalculate(roster):
                             result.get('late_entry') or result.get('early_exit'))
         result['ot_approval_status']='Pending' if has_ot else 'Not Required'
         result['punch_approval_status']='Pending' if needs_punch_review else 'Not Required'
+    doc.late_entry=int(any(result.get('late_entry') for result in current_results))
+    doc.early_exit=int(any(result.get('early_exit') for result in current_results))
+    doc.worked_hours=round(sum(float(result.get('worked_hours') or 0) for result in current_results),2)
     fields=['roster_duty','shift','first_in','last_out','worked_hours','required_hours','shortfall_hours',
             'late_entry','early_exit','planned_before_ot_hours','actual_before_ot_hours',
             'planned_after_ot_hours','actual_after_ot_hours','ot_reason','status','exception']

@@ -6,8 +6,6 @@ def after_migrate():
         if not frappe.db.exists('Role',role):
             frappe.get_doc(dict(doctype='Role',role_name=role,desk_access=int(role!='Temp Worker Integration'))).insert(ignore_permissions=True)
     frappe.db.add_unique('Temp Roster',['worker','roster_date'],constraint_name='unique_temp_worker_date')
-    if not frappe.db.get_default('temp_worker_synced_through'):
-        frappe.db.set_default('temp_worker_synced_through','1900-01-01 00:00:00')
     if frappe.db.has_column('Temp Worker','staff_id'):
         # Keep legacy workers distinct from biometric IDs until HR enters the real Staff ID.
         frappe.db.sql("""update `tabTemp Worker` set staff_id=concat('LEGACY-',name)
@@ -18,8 +16,6 @@ def after_migrate():
     if frappe.db.has_column('Temp Attendance','worker_code'):
         frappe.db.sql('''update `tabTemp Attendance` a join `tabTemp Worker` w on w.name=a.worker
             set a.worker_code=a.worker where coalesce(a.worker_code,'')='' ''')
-        frappe.db.sql('''update `tabTemp Attendance` a join `tabTemp Worker` w on w.name=a.worker
-            set a.staff_id=w.staff_id where coalesce(a.staff_id,'')='' ''')
         frappe.db.sql('''update `tabTemp Attendance` a set
             a.late_entry=exists(select 1 from `tabTemp Attendance Duty` d where d.parent=a.name and d.late_entry=1),
             a.early_exit=exists(select 1 from `tabTemp Attendance Duty` d where d.parent=a.name and d.early_exit=1),

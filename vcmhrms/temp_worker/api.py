@@ -29,6 +29,7 @@ def ingest_payload(payload, simulated=False):
     if len(payload['punches']) > 500:
         frappe.throw('Maximum 500 punches per request.')
     results=[]
+    affected=set()
     for index,row in enumerate(payload['punches']):
         savepoint=f'workforce_{index}'
         frappe.db.savepoint(savepoint)
@@ -60,18 +61,26 @@ def ingest_payload(payload, simulated=False):
                 is_simulated=int(simulated)))
             doc.flags.workforce_ingestion=True
             doc.insert(ignore_permissions=True)
+            affected.add((worker,getdate(time)))
             results.append(dict(event_id=event_id,status='created'))
         except Exception as error:
             frappe.db.rollback(save_point=savepoint)
             results.append(dict(row=index+1,status='failed',message=str(error)))
     failed=any(r['status']=='failed' for r in results)
-    # Delayed historical punches are accepted and recalculate attendance automatically.
-    frappe.enqueue('vcmhrms.temp_worker.api.recalculate_all',enqueue_after_commit=True)
+    # Recalculate only rosters near newly inserted punches. This covers overnight duties
+    # without scanning every historical roster after every provider batch.
+    roster_names=set()
+    for worker,punch_date in affected:
+        roster_names.update(frappe.get_all('Temp Roster',filters={'worker':worker,
+            'roster_date':['between',[add_days(punch_date,-1),add_days(punch_date,1)]]},pluck='name'))
+    if roster_names:
+        frappe.enqueue('vcmhrms.temp_worker.api.recalculate_rosters',
+            roster_names=sorted(roster_names),enqueue_after_commit=True)
     return dict(success=not failed,results=results)
 
 
-def recalculate_all():
-    for name in frappe.get_all('Temp Roster',pluck='name'):
+def recalculate_rosters(roster_names):
+    for name in roster_names:
         recalculate(frappe.get_doc('Temp Roster',name))
 
 

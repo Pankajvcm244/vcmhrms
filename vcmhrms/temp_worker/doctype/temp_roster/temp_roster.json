@@ -8,11 +8,19 @@
   "fields": [
     {
       "fieldname": "worker",
-      "label": "Worker",
+      "label": "Worker Name",
       "fieldtype": "Link",
       "reqd": 1,
       "in_list_view": 1,
       "options": "Temp Worker"
+    },
+    {
+      "fieldname": "staff_id",
+      "label": "Staff ID",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "fetch_from": "worker.staff_id",
+      "in_list_view": 1
     },
     {
       "fieldname": "roster_date",
@@ -51,6 +59,7 @@
   ],
   "field_order": [
     "worker",
+    "staff_id",
     "roster_date",
     "branch",
     "day_type",
@@ -97,6 +106,5 @@
   "sort_order": "DESC",
   "actions": [],
   "links": [],
-  "states": [],
-  "autoname": "hash"
+  "states": []
 }

@@ -27,7 +27,7 @@
     },
     {
       "fieldname": "smartoffice_id",
-      "label": "Smartoffice Id",
+      "label": "Biometric Code",
       "fieldtype": "Data",
       "reqd": 1,
       "unique": 1,

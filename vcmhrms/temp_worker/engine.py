@@ -55,7 +55,9 @@ def calculate(duties, punches, now, synced_through=None):
         if ambiguous:
             result.update(status='Needs Review', exception='Punch matches more than one duty window.')
         elif len(matched) == 1:
-            result.update(first_in=matched[0], status='Needs Review', exception='Only one punch; missing counterpart.')
+            result['first_in']=matched[0]
+            if complete:
+                result.update(status='Needs Review', exception='Only one punch; missing counterpart.')
         elif len(matched) >= 2:
             first, last = matched[0], matched[-1]
             evaluate_times(result,duty,first,last,complete)

@@ -37,7 +37,7 @@ are not required for a signed-in tester. Non-System Managers still need Branch U
 3. Generate Sample optionally appends Day, Night or Multiple Duties times for a chosen date.
 4. Build Preview checks timestamps and generates event IDs. Submit Test Punches automatically
    builds this preview if needed, then submits all timestamps for the selected worker.
-5. Optional Advanced JSON upload/editor must contain only that selected worker's SmartOffice ID.
+5. Optional Advanced JSON upload/editor must contain only that selected worker's Staff ID and Biometric Code.
    After editing JSON, click Preview JSON to use JSON mode. Download JSON supports sharing tests.
 6. Submit shows per-row created/duplicate/failed results. Open Punch Log to inspect saved events.
    Attendance recalculates in the background; authorized roster editors can also recalculate manually.
@@ -55,9 +55,9 @@ attendance records, so use an isolated staging site. Keep event IDs unchanged to
 generate a new sample for a fresh scenario. Simulated events and normal SmartOffice events share
 the same event-ID uniqueness constraints and ingestion/calculation logic.
 
-Global sync completeness is NOT advanced by default, even when JSON includes synced_through.
-Only System Manager can explicitly enable this checkbox. It advances the same global watermark
-as SmartOffice and can finalize all eligible rosters. Without completeness, results may be Pending.
+Attendance finalizes automatically after each duty's complete punch and OT capture window closes.
+An hourly scheduler finalizes Pending records. Delayed historical punches remain accepted and trigger
+recalculation, so the simulator does not require a synchronization-completeness control.
 
 ## API contract
 
@@ -69,38 +69,39 @@ Example:
 ```json
 {
   "punches": [
-    {"event_id":"SO-1001","person_id":"900001","punch_time":"2026-10-08T22:00:00+05:30","device_id":"VRN-01","location":"Vrindavan"},
-    {"event_id":"SO-1002","person_id":"900001","punch_time":"2026-10-09T06:00:00+05:30","device_id":"VRN-01","location":"Vrindavan"}
-  ],
-  "synced_through":"2026-10-09T07:00:00+05:30"
+    {"staff_id":"TEMP-0001","biometric_code":"900001","punch_time":"2026-10-08T22:00:00+05:30"},
+    {"staff_id":"TEMP-0001","biometric_code":"900001","punch_time":"2026-10-09T06:00:00+05:30"}
+  ]
 }
 ```
 
-Use globally unique event IDs and globally unique person IDs across all SmartOffice locations.
-Worker SmartOffice IDs are numeric strings beginning with 9. No IN/OUT is required or stored.
+Staff ID and Biometric Code must identify the same Temp Worker. Biometric Codes are numeric strings
+beginning with 9. No IN/OUT or external event ID is required. ERPNext generates a deterministic
+event ID internally, so retrying an unchanged punch is idempotent.
 Timestamp offsets are mandatory; stored timestamps use the site's timezone.
 API returns per-event created/duplicate/failed outcomes. Retry failed rows; unchanged event IDs
 are idempotent. Conflicting event IDs are rejected. Unknown workers must be registered then retried.
-The watermark is GLOBAL: send it only when ALL locations have delivered ALL events through that
-time. Do not advance it for one location while another is offline. Failed batches do not advance it.
 Without a confirmed watermark, results remain Pending; never infer absence from an offline feed.
 The queue recalculates all rosters after a batch in this first small-scale release.
 
 ## Calculation and scope
 
 - Temp Worker has two separate identifiers: manually entered `Staff ID` for the organization and
-  `SmartOffice ID` for biometric/API matching. They are never substituted for one another. New
+  `Biometric Code` for biometric/API matching. They are never substituted for one another. New
   document IDs use `TW-YYMM-xxxxx`; existing IDs remain unchanged after migration. Existing workers
   receive a `LEGACY-<old worker ID>` Staff ID placeholder that HR must replace with the real Staff ID.
-- New attendance IDs use `TEMPATT-<Staff ID>-YYMMDD-xx`. New punch IDs use
-  `TempPunch-<Staff ID>-YYMMDD-xx`. Existing attendance and punch IDs remain unchanged.
+- New attendance IDs use `TEMPATT-YYMM-xxxxxx`. New punch IDs use
+  `TempPunch-<Staff ID>-YYMMDD-xx`. Temp Attendance does not duplicate Staff ID; it retains Worker
+  Code and the Worker Name link. Existing attendance and punch IDs remain unchanged.
+- New roster IDs use `TEMPROST-YYMM-xxxxx`, where YYMM comes from the roster date. Existing roster
+  IDs remain unchanged.
 - Roster duty start/end datetimes support overnight and multiple shifts. Date means duty-start date.
 - First/last punch within a window infer IN/OUT. Break minutes are subtracted once per duty.
 - Flexy uses explicit per-day start/end attendance windows and required hours. This release does
   not apply late-entry deductions or automatically move windows relative to arrival.
 - A punch eligible for multiple duty windows makes those duties Needs Review with zero counted
   hours; the system does not invent a boundary punch or split continuous hours.
-- Single punch is Needs Review. Absent is calculated only after shift windows and sync completeness.
+- Single punch is Needs Review. Absent is calculated only after the complete shift capture window closes.
 - No government holiday calendar is consulted. Weekly off is explicit in roster.
 - Bulk allocation replaces a worker's existing duty rows in the selected range with one shift or off.
   Add multiple duties through the daily roster form.
@@ -147,7 +148,7 @@ The queue recalculates all rosters after a batch in this first small-scale relea
 ## Validation before production
 
 Simulator boundary tests cover roles, one-worker batches, branches, watermark restrictions, future dates and multi-date overnight input.
-Local pure engine tests cover overnight, missing punches, pending sync, boundary ambiguity,
+Local pure engine tests cover overnight, missing punches, open capture windows, boundary ambiguity,
 separated multiple shifts, duplicate timestamps, breaks and OT. Python/JSON/JS syntax is checked.
 No live Frappe bench was available during development. On staging, verify migration, roles,
 Branch restrictions, form save, API authentication, retries, concurrent events, monthly page,
