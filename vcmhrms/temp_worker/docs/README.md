@@ -58,7 +58,7 @@ the same event-ID uniqueness constraints and ingestion/calculation logic.
 Attendance finalizes automatically after each duty's complete punch and OT capture window closes.
 A scheduler at 04:00 finalizes eligible day/evening records, and another run at 16:00 handles night
 shifts ending in the morning, including their configured after-shift capture window. Managers can run
-the same process from **Temp Attendance Review > Finalize Pending** for testing or an operational recheck. Delayed
+the same process from **Temp Attendance Review > Process Attendance** for testing or an operational recheck. Delayed
 historical punches remain accepted and recalculate only nearby rosters for that worker.
 
 ## API contract

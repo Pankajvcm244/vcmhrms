@@ -45,7 +45,7 @@ ERPNext finalizes a duty when the current time passes its complete capture windo
 the scheduled shift, early/late matching allowance, and configured before/after-shift OT capture hours.
 The scheduler runs at 04:00 for eligible day/evening duties and at 16:00 for night duties that end in
 the morning, including their after-shift capture window. These runs also finalize Absent days with no
-punches. Managers can run the same calculation immediately from **Temp Attendance Review > Finalize Pending**.
+punches. Managers can run the same calculation immediately from **Temp Attendance Review > Process Attendance**.
 
 ### Example
 
@@ -78,6 +78,9 @@ manager review. Original punches and changes remain auditable.
 
 ERPNext validates that Staff ID and Biometric Code belong to the same Temp Worker and creates the event
 ID internally. Repeating the same punch is safe and is treated as a duplicate.
+
+Punch times without a UTC offset are interpreted in the ERPNext site's configured timezone
+(`Asia/Kolkata`). Offset-aware ISO timestamps remain supported for compatibility.
 
 ## Monthly attendance codes
 
@@ -127,7 +130,7 @@ Additional markers:
 
 **PD is a timing state.** Punch data may be correct, but the configured capture window is still open.
 
-The next scheduled 04:00 or 16:00 run finalizes it after the window closes. A manager can use **Finalize Pending**
+The next scheduled 04:00 or 16:00 run finalizes it after the window closes. A manager can use **Process Attendance**
 when the result is needed before the next scheduled run.
 
 

@@ -142,13 +142,6 @@ permission_query_conditions = {
     # "Employee": "vcmhrms.vcm_hrms.utilities.access_guard.employee_permission_query",
 }
 
-permission_query_conditions.update({
-    "Temp Worker": "vcmhrms.temp_worker.permissions.worker_query",
-    "Temp Roster": "vcmhrms.temp_worker.permissions.roster_query",
-    "Temp Attendance": "vcmhrms.temp_worker.permissions.attendance_query",
-    "Temp Punch": "vcmhrms.temp_worker.permissions.punch_query",
-})
-
 # blocks direct URL/form/API access.
 has_permission = {
     "Salary Slip": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
@@ -206,12 +199,12 @@ doc_events = {
     "Attendance": {
         "validate": [
             "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_flex_min_hours", # order matters here - flex hours must be applied before strict hours
-            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",            
+            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",
             "vcmhrms.vcm_hrms.overrides.attendance_hooks.enforce_late_entry_policy",
         ],
         "on_update_after_submit": [
             "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_flex_min_hours",
-            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",            
+            "vcmhrms.vcm_hrms.overrides.attendance_hooks.apply_nonflex_strict_hours",
             "vcmhrms.vcm_hrms.overrides.attendance_hooks.enforce_late_entry_policy",
         ],
     },
@@ -222,7 +215,7 @@ doc_events = {
         "before_submit": "vcmhrms.vcm_hrms.overrides.leavefix.fix_existing_attendance",
         "validate": "vcmhrms.vcm_hrms.overrides.leavefix.validate_locked_attendance"
     },
-    
+
 }
 
 # Scheduled Tasks
