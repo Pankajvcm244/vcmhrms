@@ -82,15 +82,29 @@ def ingest_payload(payload, simulated=False):
     for worker,punch_date in affected:
         roster_names.update(frappe.get_all('Agency Roster',filters={'worker':worker,
             'roster_date':['between',[add_days(punch_date,-1),add_days(punch_date,1)]]},pluck='name'))
-    if roster_names:
+    roster_names=sorted(roster_names)
+    # Keep each job bounded. A maximum-size provider batch can affect hundreds of
+    # rosters, and one large job may exceed the worker timeout after all punches
+    # have already committed.
+    for offset in range(0,len(roster_names),50):
+        chunk=roster_names[offset:offset+50]
+        job_key=sha256('|'.join(chunk).encode()).hexdigest()[:12]
         frappe.enqueue('vcmhrms.agency_worker.api.recalculate_rosters',
-            roster_names=sorted(roster_names),enqueue_after_commit=True)
+            roster_names=chunk,enqueue_after_commit=True,
+            job_name=f'Agency punch recalculation {job_key}')
     return dict(success=not failed,results=results)
 
 
 def recalculate_rosters(roster_names):
+    recalculated=failed=0
     for name in roster_names:
-        recalculate(frappe.get_doc('Agency Roster',name))
+        try:
+            recalculate(frappe.get_doc('Agency Roster',name))
+            recalculated+=1
+        except Exception:
+            failed+=1
+            frappe.log_error(frappe.get_traceback(),f'Agency punch recalculation failed: {name}')
+    return dict(recalculated=recalculated,failed=failed)
 
 
 def finalize_pending_attendance():

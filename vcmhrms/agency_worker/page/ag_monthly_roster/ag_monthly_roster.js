@@ -21,7 +21,8 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
             {fieldname:'from_date',label:'From Date',fieldtype:'Date',reqd:1,default:`${year}-${monthNumber}-01`},
             {fieldname:'to_date',label:'To Date',fieldtype:'Date',reqd:1,default:`${year}-${monthNumber}-${String(lastDay).padStart(2,'0')}`},
             {fieldname:'shift',label:'Simple Shift',fieldtype:'Link',options:'Agency Shift',reqd:1},
-            {fieldname:'weekly_off',label:'Weekly Off Day',fieldtype:'Select',options:'\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday'},
+            {fieldname:'weekly_off',label:'Weekly Off Day',fieldtype:'Select',
+                options:'Use Worker Default\nNo Weekly Off\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday',default:'Use Worker Default'},
             {fieldname:'existing_action',label:'Existing Roster Dates',fieldtype:'Select',options:'Skip Existing\nReplace Existing',default:'Skip Existing',reqd:1},
             {fieldname:'warning',fieldtype:'HTML',options:'<p class="text-muted">Use Replace Existing only when you intend to remove existing OT or multiple duties in this date range.</p>'}
         ],primary_action_label:__('Apply Assignment'),primary_action:async values=>{

@@ -331,31 +331,55 @@ Every change to `vcmhrms/agency_worker` should verify at least:
 12. Punch correction preserves originals and records its audit trail.
 13. Late historical punch recalculates an unlocked attendance record.
 14. Duplicate API retry creates no duplicate Agency Punch.
-15. Offset-free India time and offset-bearing ISO time normalize correctly.
-16. Bulk roster assignment handles multiple workers, weekly offs, Skip Existing, and
+15. A maximum-size punch batch recalculates every affected roster through bounded
+    background jobs; failure of one roster does not stop the remaining rosters.
+16. Offset-free India time and offset-bearing ISO time normalize correctly.
+17. Bulk roster assignment handles multiple workers, weekly offs, Skip Existing, and
     Replace Existing and reports failures.
-17. Roster Manager and Supervisor cannot act on unmapped workers, including by
+18. Roster Manager and Supervisor cannot act on unmapped workers, including by
     changing request parameters or report filters.
-18. Budget Location User Permission is enforced server-side.
-19. Agency holidays do not query regular HRMS Holiday List records.
-20. A holiday date retains its real attendance/OT/pending state while receiving the
-    configured holiday colour.
-21. The monthly report uses the 26th-to-25th range, shows weekdays, totals statuses and
+19. Budget Location User Permission is enforced server-side.
+20. Agency holidays do not query regular HRMS Holiday List records.
+21. A holiday date retains its real attendance/OT/pending state, receives the configured
+    holiday colour, and does not display an `H` holiday marker.
+22. The monthly report provides a Year selector containing the current year and roster
+    data years, plus a January-to-December Month selector.
+23. The monthly report uses the 26th-to-25th range, shows weekdays, totals statuses and
     OT correctly, and shows a tick only when no action is pending.
-22. Locking fails when any attendance, punch review, or OT review is incomplete.
-23. After locking, UI actions, direct RPC calls, bulk jobs, recalculation, and biometric
+24. Attendance Review displays dates and the date part of punch times as `DD-MM-YYYY`.
+25. Locking fails when any attendance, punch review, or OT review is incomplete.
+26. After locking, UI actions, direct RPC calls, bulk jobs, recalculation, and biometric
     ingestion cannot change the period.
-24. Scheduled and manual finalization produce the same idempotent result.
+27. Scheduled and manual finalization produce the same idempotent result.
 
-## 18. Current review baseline
+## 18. Initial agency-data import rules
+
+- Agency Staff ID comes from the source employee code. It is independent from the
+  Biometric Code and may contain letters, numbers, hyphens, underscores, or slashes.
+- Biometric Code is mandatory, read-only, and assigned automatically on first save
+  from one global concurrency-safe `9xxxxxx` series. Users and imports do not enter it.
+- Budget Location defaults to `VRN` for the initial agency-worker import.
+- Active From defaults to `2026-09-01` for the initial import when no worker-specific
+  start date is supplied.
+- Source `Supervisor/Roster Assign` people become Roster Managers. Each person must be
+  resolved to an individual enabled Frappe User before assignment.
+- Source `Approval Authority Admin` people become Supervisors responsible for OT and
+  punch/mispunch approval. Each person must be resolved to an individual enabled
+  Frappe User before assignment.
+- A valid weekday is stored as Default Weekly Off. `N/A`, blank, and unknown values
+  import as blank; obvious spelling errors such as `Satuarday` are normalized.
+- Bulk simple-shift assignment uses each worker's Default Weekly Off unless the user
+  selects a common weekday or explicitly selects No Weekly Off.
+
+## 19. Current review baseline
 
 Reviewed against `develop` commit `31326b2` on 2026-10-15.
 
 The following gaps were found at that baseline. They are retained here as explicit
 regression cases and must not be reintroduced:
 
-1. Agency-holiday dates are rendered as `H ✓` before attendance rows are evaluated.
-   This can hide Pending/Needs Review, punch approval, OT approval, status totals, and
+1. Agency-holiday dates were rendered as `H ✓` before attendance rows were evaluated.
+   This could hide Pending/Needs Review, punch approval, OT approval, status totals, and
    approved OT on a holiday.
 2. The report treats Agency Worker Manager like an individual supervisor when the
    Supervisor filter is blank. Therefore the intended `blank = All` view can return no

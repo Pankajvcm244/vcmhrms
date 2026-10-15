@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import frappe
 from frappe.utils import getdate
+from frappe.utils import today
 
 from vcmhrms.agency_worker.period_lock import period_dates
 from vcmhrms.agency_worker.permissions import is_supervisor
@@ -35,10 +36,25 @@ def get_supervisors(doctype,txt,searchfield,start,page_len,filters):
         order by u.full_name limit %(start)s,%(page_len)s""",values)
 
 
+@frappe.whitelist()
+def get_payroll_years():
+    current_year=getdate(today()).year
+    years={current_year}
+    years.update(int(row.year) for row in frappe.db.sql(
+        """select distinct year(roster_date) year from `tabAgency Roster`
+        where roster_date is not null order by year desc""",as_dict=True) if row.year)
+    return [str(year) for year in sorted(years,reverse=True)]
+
+
 def execute(filters=None):
     filters=frappe._dict(filters or {})
     if not filters.month: frappe.throw('Month is required.')
-    start,end=period_dates(filters.month)
+    if filters.year:
+        try: period=f'{int(str(filters.month)[:2]):02d}-{int(filters.year):04d}'
+        except (TypeError,ValueError): frappe.throw('Select a valid payroll month and year.')
+    else:
+        period=filters.month
+    start,end=period_dates(period)
     if filters.budget_location: check_budget_location(filters.budget_location)
     conditions=['w.status=%(status)s']; values={'status':'Active'}
     if filters.budget_location: conditions.append('w.budget_location=%(location)s'); values['location']=filters.budget_location
@@ -92,13 +108,16 @@ def execute(filters=None):
     data=[]
     for worker in workers:
         row=frappe._dict(**worker,present_days=0,half_days=0,absent_days=0,approved_ot=0,
-            holiday_colour=(agency_meta.get(worker.agency) or {}).get('holiday_colour') or '#6f42c1')
+            holiday_colour=(agency_meta.get(worker.agency) or {}).get('holiday_colour') or '#6f42c1',
+            holiday_fields=[])
         for i,date in enumerate(dates,1):
+            fieldname=f'day_{i}'
             items=by_day.get((worker.name,date),[])
             is_holiday=date in holidays.get(worker.agency,set())
+            if is_holiday: row.holiday_fields.append(fieldname)
             if (worker.name,date) in offs: code='OFF ✓'
             elif not items:
-                row[f'day_{i}']='H ✓' if is_holiday else '—'
+                row[fieldname]='—'
                 continue
             else:
                 code=_day_status(items)
@@ -109,10 +128,9 @@ def execute(filters=None):
                 flags=(' L' if any(x.late_entry for x in items) else '')+(' E' if any(x.early_exit for x in items) else '')
                 pending=any((x.status in ('Pending','Needs Review') or x.ot_approval_status=='Pending' or x.punch_approval_status=='Pending') for x in items)
                 code+=flags+('' if pending else ' ✓')
-                if is_holiday: code='H '+code
-            row[f'day_{i}']=code
+            row[fieldname]=code
         row.approved_ot=round(row.approved_ot,2); data.append(row)
-    message=f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. ✓ means the supervisor has no pending punch or OT action. H is an agency holiday.'
+    message=f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. ✓ means the supervisor has no pending punch or OT action. Agency holidays use the agency holiday colour.'
     return columns,data,message
 
 

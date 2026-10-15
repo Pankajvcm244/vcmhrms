@@ -7,6 +7,16 @@ frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
     const reviewStatus=page.add_field({fieldname:'review_status',label:'Punch Approval',fieldtype:'Select',options:'Pending\nApproved\nAll',default:'Pending'});
     const body=$('<div class="mt-3" style="overflow:auto"></div>').appendTo(page.main);
     const esc=value=>frappe.utils.escape_html(String(value??''));
+    const displayDate=value=>{
+        if (!value) return '';
+        const [year,month,day]=String(value).slice(0,10).split('-');
+        return day&&month&&year?`${day}-${month}-${year}`:String(value);
+    };
+    const displayDatetime=value=>{
+        if (!value) return '';
+        const text=String(value).replace('T',' ');
+        return `${displayDate(text.slice(0,10))} ${text.slice(11,19)}`.trim();
+    };
     let rows=[];
     async function load(){
         const {message}=await frappe.call({method:'vcmhrms.agency_worker.attend_review.get_exceptions',args:{
@@ -16,8 +26,8 @@ frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
         body.html(`<p>${rows.length} attendance exceptions. Managers see only workers assigned to them; System Manager is backup.</p>
         <table class="table table-bordered"><thead><tr><th>Worker</th><th>Date</th><th>Shift</th><th>First In</th><th>Last Out</th>
         <th>Worked</th><th>Required</th><th>Status</th><th>Flags</th><th>Punch Approval</th><th>Approved By</th><th>Action</th></tr></thead><tbody>`+
-        rows.map((row,index)=>`<tr><td>${esc(row.worker_name)}</td><td>${esc(row.date)}</td><td>${esc(row.shift)}</td>
-        <td>${esc(row.first_in)}</td><td>${esc(row.last_out)}</td><td>${row.worked_hours}</td><td>${row.required_hours}</td>
+        rows.map((row,index)=>`<tr><td>${esc(row.worker_name)}</td><td>${esc(displayDate(row.date))}</td><td>${esc(row.shift)}</td>
+        <td>${esc(displayDatetime(row.first_in))}</td><td>${esc(displayDatetime(row.last_out))}</td><td>${row.worked_hours}</td><td>${row.required_hours}</td>
         <td>${esc(row.status)}</td><td>${esc(row.issues)}</td><td>${esc(row.punch_approval_status)}</td><td>${esc(row.punch_approved_by)}</td>
         <td><button class="btn btn-xs btn-primary correct" data-index="${index}">Correct / Exception</button>
         ${row.punch_approval_status==='Pending'?`<button class="btn btn-xs btn-default approve ml-1" data-index="${index}">Approve Punch</button>`:''}</td></tr>`).join('')+'</tbody></table>');
@@ -26,7 +36,7 @@ frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
     }
     function approvePunch(row){
         const dialog=new frappe.ui.Dialog({title:`Approve Punch Exception — ${row.worker_name}`,fields:[
-            {fieldname:'details',fieldtype:'HTML',options:`<p><b>${esc(row.date)} · ${esc(row.shift)}</b><br>${esc(row.issues)}<br>Status: ${esc(row.status)}</p>`},
+            {fieldname:'details',fieldtype:'HTML',options:`<p><b>${esc(displayDate(row.date))} · ${esc(row.shift)}</b><br>${esc(row.issues)}<br>Status: ${esc(row.status)}</p>`},
             {fieldname:'remarks',label:'Approval Remarks',fieldtype:'Small Text',reqd:1}
         ],primary_action_label:'Approve As Calculated',primary_action:async values=>{
             await frappe.call({method:'vcmhrms.agency_worker.attend_review.approve_punch',args:{attendance:row.attendance,
@@ -36,7 +46,7 @@ frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
     }
     function openDialog(row){
         const dialog=new frappe.ui.Dialog({title:`Attendance Review — ${row.worker_name}`,fields:[
-            {fieldname:'details',fieldtype:'HTML',options:`<p><b>${esc(row.date)} · ${esc(row.shift)}</b><br>${esc(row.issues)}</p>`},
+            {fieldname:'details',fieldtype:'HTML',options:`<p><b>${esc(displayDate(row.date))} · ${esc(row.shift)}</b><br>${esc(row.issues)}</p>`},
             {fieldname:'corrected_first_in',label:'Corrected First In',fieldtype:'Datetime',default:row.corrected_first_in||row.first_in},
             {fieldname:'corrected_last_out',label:'Corrected Last Out',fieldtype:'Datetime',default:row.corrected_last_out||row.last_out},
             {fieldname:'status_override',label:'Status Exception',fieldtype:'Select',options:'\nPresent\nHalf Day\nAbsent',default:row.status_override},

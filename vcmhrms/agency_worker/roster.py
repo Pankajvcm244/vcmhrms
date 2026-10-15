@@ -69,7 +69,8 @@ def allocate_bulk(workers,budget_location,from_date,to_date,shift,weekly_off=Non
     if existing_action not in ('Skip Existing','Replace Existing'):
         frappe.throw('Invalid existing-roster action.')
     weekdays={'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'}
-    if weekly_off and weekly_off not in weekdays:
+    weekly_off=weekly_off or 'Use Worker Default'
+    if weekly_off not in weekdays|{'Use Worker Default','No Weekly Off'}:
         frappe.throw('Invalid weekly-off day.')
     frappe.get_doc('Agency Shift',shift).check_permission('read')
     for worker in workers:
@@ -103,6 +104,8 @@ def allocate_bulk_job(workers,budget_location,from_date,to_date,shift,weekly_off
         worker_created=worker_replaced=worker_skipped=0
         try:
             person=frappe.get_doc('Agency Worker',worker)
+            worker_weekly_off=(person.default_weekly_off if weekly_off in (None,'','Use Worker Default')
+                else None if weekly_off=='No Weekly Off' else weekly_off)
             while day<=end:
                 if day<getdate(person.active_from) or (person.active_until and day>getdate(person.active_until)):
                     worker_skipped+=1
@@ -114,7 +117,7 @@ def allocate_bulk_job(workers,budget_location,from_date,to_date,shift,weekly_off
                     day+=timedelta(days=1)
                     continue
                 doc=frappe.get_doc('Agency Roster',name) if name else frappe.new_doc('Agency Roster')
-                day_type='Weekly Off' if weekly_off and day.strftime('%A')==weekly_off else 'Duty'
+                day_type='Weekly Off' if worker_weekly_off and day.strftime('%A')==worker_weekly_off else 'Duty'
                 doc.update(dict(worker=worker,budget_location=budget_location,roster_date=day,day_type=day_type))
                 doc.set('duties',[])
                 if day_type=='Duty':

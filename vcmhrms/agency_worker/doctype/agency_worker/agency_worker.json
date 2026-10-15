@@ -29,6 +29,9 @@
       "fieldname": "smartoffice_id",
       "label": "Biometric Code",
       "fieldtype": "Data",
+      "default": "AUTO",
+      "description": "Assigned automatically from the global 9xxxxxx series when the worker is first saved.",
+      "read_only": 1,
       "reqd": 1,
       "unique": 1,
       "in_list_view": 1
@@ -65,6 +68,12 @@
       "reqd": 1,
       "options": "Budget Location",
       "default": "VRN"
+    },
+    {
+      "fieldname": "default_weekly_off",
+      "label": "Default Weekly Off",
+      "fieldtype": "Select",
+      "options": "\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday"
     },
     {
       "fieldname": "roster_assignment_section",
@@ -115,6 +124,7 @@
     "worker_role",
     "department",
     "budget_location",
+    "default_weekly_off",
     "roster_assignment_section",
     "roster_managers",
     "supervisor_column",
