@@ -351,8 +351,8 @@ Every change to `vcmhrms/agency_worker` should verify at least:
 
 Reviewed against `develop` commit `31326b2` on 2026-10-15.
 
-The following gaps were present at that baseline and must be resolved before treating
-the corresponding requirements as protected by code:
+The following gaps were found at that baseline. They are retained here as explicit
+regression cases and must not be reintroduced:
 
 1. Agency-holiday dates are rendered as `H ✓` before attendance rows are evaluated.
    This can hide Pending/Needs Review, punch approval, OT approval, status totals, and

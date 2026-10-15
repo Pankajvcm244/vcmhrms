@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import frappe
 from frappe.utils import get_datetime, now_datetime, getdate, add_days
 from vcmhrms.agency_worker.service import recalculate
+from vcmhrms.agency_worker.period_lock import is_locked
 
 
 def timestamp(value):
@@ -59,6 +60,11 @@ def ingest_payload(payload, simulated=False):
             person=frappe.get_doc('Agency Worker',worker)
             if getdate(time)<getdate(person.active_from) or (person.active_until and getdate(time)>getdate(person.active_until)):
                 frappe.throw('Punch falls outside worker engagement dates.')
+            nearby_rosters=frappe.get_all('Agency Roster',filters={'worker':worker,
+                'roster_date':['between',[add_days(getdate(time),-1),add_days(getdate(time),1)]]},
+                fields=['roster_date','budget_location'])
+            if any(is_locked(row.roster_date,row.budget_location) for row in nearby_rosters):
+                frappe.throw('Punch affects a locked attendance period and cannot be accepted.')
             doc=frappe.get_doc(dict(doctype='Agency Punch',event_id=event_id,worker=worker,staff_id=person.staff_id,
                 punch_time=time,device_id=row.get('device_id'),source_location=row.get('location'),received_at=now_datetime(),
                 is_simulated=int(simulated)))

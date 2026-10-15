@@ -9,8 +9,11 @@ from vcmhrms.agency_worker.permissions import is_supervisor
 from vcmhrms.agency_worker.service import check_budget_location
 
 
-def _system_manager():
-    return frappe.session.user=='Administrator' or 'System Manager' in frappe.get_roles()
+def _can_view_all_workers():
+    roles=set(frappe.get_roles())
+    return frappe.session.user=='Administrator' or bool(
+        {'System Manager','Agency Worker Manager'} & roles
+    )
 
 
 def _day_status(items):
@@ -42,7 +45,7 @@ def execute(filters=None):
     if filters.agency: conditions.append('w.agency=%(agency)s'); values['agency']=filters.agency
     if filters.department: conditions.append('w.department=%(department)s'); values['department']=filters.department
     supervisor=filters.supervisor
-    if not _system_manager() and not supervisor: supervisor=frappe.session.user
+    if not _can_view_all_workers() and not supervisor: supervisor=frappe.session.user
     if supervisor:
         conditions.append("""exists(select 1 from `tabAgency Worker Supervisor` s
             where s.parent=w.name and s.parenttype='Agency Worker' and s.user=%(supervisor)s)""")
@@ -75,9 +78,13 @@ def execute(filters=None):
         for x in records: by_day[(x.worker,getdate(x.roster_date))].append(x)
         offs={(r.worker,getdate(r.roster_date)) for r in rosters if r.day_type=='Weekly Off'}
     agency_meta={x.name:x for x in frappe.get_all('Agency',fields=['name','agency_holiday_list','holiday_colour'])}
+    holiday_lists={meta.agency_holiday_list for meta in agency_meta.values()
+        if meta.agency_holiday_list}
+    enabled_holiday_lists=set(frappe.get_all('Agency Holiday List',
+        filters={'name':['in',list(holiday_lists)],'disabled':0},pluck='name')) if holiday_lists else set()
     holidays=defaultdict(set)
     for name,meta in agency_meta.items():
-        if meta.agency_holiday_list:
+        if meta.agency_holiday_list in enabled_holiday_lists:
             holidays[name]=set(getdate(x.holiday_date) for x in frappe.get_all(
                 'Agency Holiday',filters={'parent':meta.agency_holiday_list,
                     'parenttype':'Agency Holiday List','holiday_date':['between',[start,end]]},
@@ -88,9 +95,11 @@ def execute(filters=None):
             holiday_colour=(agency_meta.get(worker.agency) or {}).get('holiday_colour') or '#6f42c1')
         for i,date in enumerate(dates,1):
             items=by_day.get((worker.name,date),[])
-            if date in holidays.get(worker.agency,set()): code='H'
-            elif (worker.name,date) in offs: code='OFF'
-            elif not items: row[f'day_{i}']='—'; continue
+            is_holiday=date in holidays.get(worker.agency,set())
+            if (worker.name,date) in offs: code='OFF ✓'
+            elif not items:
+                row[f'day_{i}']='H ✓' if is_holiday else '—'
+                continue
             else:
                 code=_day_status(items)
                 if code=='P': row.present_days+=1
@@ -100,7 +109,7 @@ def execute(filters=None):
                 flags=(' L' if any(x.late_entry for x in items) else '')+(' E' if any(x.early_exit for x in items) else '')
                 pending=any((x.status in ('Pending','Needs Review') or x.ot_approval_status=='Pending' or x.punch_approval_status=='Pending') for x in items)
                 code+=flags+('' if pending else ' ✓')
-            if code in ('H','OFF'): code+=' ✓'
+                if is_holiday: code='H '+code
             row[f'day_{i}']=code
         row.approved_ot=round(row.approved_ot,2); data.append(row)
     message=f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. ✓ means the supervisor has no pending punch or OT action. H is an agency holiday.'
