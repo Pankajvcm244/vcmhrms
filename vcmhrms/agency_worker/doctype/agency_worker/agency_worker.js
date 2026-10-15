@@ -5,6 +5,6 @@ frappe.ui.form.on('Agency Worker', {
             frappe.route_options = {worker: frm.doc.name};
             frappe.set_route('List', 'Agency Punch');
         });
-        frm.add_custom_button(__('Monthly Roster'), () => frappe.set_route('agency-monthly-roster'));
+        frm.add_custom_button(__('Monthly Roster'), () => frappe.set_route('ag-monthly-roster'));
     }
 });

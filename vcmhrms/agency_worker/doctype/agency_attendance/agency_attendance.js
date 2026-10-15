@@ -1,7 +1,7 @@
 frappe.ui.form.on('Agency Attendance', {
     refresh(frm) {
         if (frappe.user_roles.includes('System Manager') || frappe.user_roles.includes('Agency Worker Manager')) {
-            frm.add_custom_button(__('Bulk OT Approval'), () => frappe.set_route('agency-ot-approval'));
+            frm.add_custom_button(__('Bulk OT Approval'), () => frappe.set_route('ag-ot-approval'));
             frm.add_custom_button(__('Attendance Review'), () => frappe.set_route('attend-review-page'));
             frm.add_custom_button(__('Monthly Attendance'), () => frappe.set_route('query-report', 'Agency Monthly Attendance'));
         }

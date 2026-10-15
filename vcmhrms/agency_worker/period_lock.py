@@ -32,13 +32,34 @@ def lock_period(month,budget_location):
     if end>=getdate(today()):
         frappe.throw('Only a completed attendance period ending before today can be locked.')
     if is_locked(end,budget_location): return {'already_locked':1}
-    pending=frappe.db.sql('''select count(*) from `tabAgency Attendance Duty` d
-        join `tabAgency Attendance` a on a.name=d.parent
-        join `tabAgency Roster` r on r.name=a.roster
-        where r.budget_location=%s and r.roster_date between %s and %s and
-        (d.status in ('Pending','Needs Review') or d.ot_approval_status='Pending' or d.punch_approval_status='Pending')''',
-        (budget_location,start,end))[0][0]
-    if pending: frappe.throw(f'Cannot lock this period: {pending} duty records still need supervisor action.')
+    duty_rosters=frappe.db.count('Agency Roster',filters={
+        'budget_location':budget_location,'roster_date':['between',[start,end]],'day_type':'Duty'})
+    if not duty_rosters:
+        frappe.throw('Cannot lock this period because it contains no Duty rosters.')
+    incomplete=frappe.db.sql('''select count(*)
+        from `tabAgency Roster` r
+        left join `tabAgency Roster Duty` rd
+          on rd.parent=r.name and rd.parenttype='Agency Roster'
+        left join `tabAgency Attendance` a on a.roster=r.name
+        left join `tabAgency Attendance Duty` ad
+          on ad.parent=a.name and ad.parenttype='Agency Attendance'
+         and ad.roster_duty=rd.name
+        where r.budget_location=%s
+          and r.roster_date between %s and %s
+          and r.day_type='Duty'
+          and (
+              rd.name is null
+              or a.name is null
+              or ad.name is null
+              or coalesce(ad.status,'Pending') in ('Pending','Needs Review')
+              or coalesce(ad.ot_approval_status,'Not Required')='Pending'
+              or coalesce(ad.punch_approval_status,'Not Required')='Pending'
+          )''',(budget_location,start,end))[0][0]
+    if incomplete:
+        frappe.throw(
+            f'Cannot lock this period: {incomplete} roster duties are missing attendance '
+            'or still need supervisor action.'
+        )
     doc=frappe.get_doc({'doctype':'Agency Attendance Lock','period_label':month,'period_start':start,
         'period_end':end,'budget_location':budget_location,'locked_by':frappe.session.user,'locked_at':now_datetime()})
     doc.insert(ignore_permissions=True)
