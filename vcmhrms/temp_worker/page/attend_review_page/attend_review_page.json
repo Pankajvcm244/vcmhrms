@@ -1,5 +1,0 @@
-{
-  "doctype":"Page", "name":"attend-review-page", "page_name":"attend-review-page",
-  "title":"Temp Attendance Review", "module":"Temp Worker", "standard":"Yes",
-  "roles":[{"role":"System Manager"},{"role":"Temp Worker Manager"}]
-}

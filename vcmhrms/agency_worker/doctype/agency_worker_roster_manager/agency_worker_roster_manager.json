@@ -1,0 +1,25 @@
+{
+  "doctype": "DocType",
+  "name": "Agency Worker Roster Manager",
+  "module": "Agency Worker",
+  "istable": 1,
+  "engine": "InnoDB",
+  "fields": [
+    {
+      "fieldname": "user",
+      "label": "User",
+      "fieldtype": "Link",
+      "options": "User",
+      "reqd": 1,
+      "in_list_view": 1
+    }
+  ],
+  "field_order": [
+    "user"
+  ],
+  "permissions": [],
+  "actions": [],
+  "links": [],
+  "states": []
+}
+

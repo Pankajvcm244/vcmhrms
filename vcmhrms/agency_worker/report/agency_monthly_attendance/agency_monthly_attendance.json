@@ -1,0 +1,14 @@
+{
+  "doctype": "Report",
+  "name": "Agency Monthly Attendance",
+  "report_name": "Agency Monthly Attendance",
+  "ref_doctype": "Agency Roster",
+  "report_type": "Script Report",
+  "is_standard": "Yes",
+  "module": "Agency Worker",
+  "roles": [
+    {"role": "System Manager"},
+    {"role": "Agency Worker Manager"}
+  ]
+}
+

@@ -1,6 +1,0 @@
-{
-  "doctype": "Page", "name": "temp-punch-simulator",
-  "page_name": "temp-punch-simulator", "title": "Temp Punch Simulator",
-  "module": "Temp Worker", "standard": "Yes",
-  "roles": [{"role": "System Manager"}, {"role": "ERP Manager"}]
-}

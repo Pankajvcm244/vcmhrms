@@ -1,5 +1,0 @@
-{
-  "doctype":"Page", "name":"temp-ot-approval", "page_name":"temp-ot-approval",
-  "title":"Temp OT Approval", "module":"Temp Worker", "standard":"Yes",
-  "roles":[{"role":"System Manager"},{"role":"Temp Worker Manager"}]
-}

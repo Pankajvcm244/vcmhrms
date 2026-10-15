@@ -135,10 +135,10 @@ permission_query_conditions = {
     "Employee Tax Exemption Proof Submission": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Application": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
-    "Temp Worker": "vcmhrms.temp_worker.permissions.worker_query",
-    "Temp Roster": "vcmhrms.temp_worker.permissions.roster_query",
-    "Temp Attendance": "vcmhrms.temp_worker.permissions.attendance_query",
-    "Temp Punch": "vcmhrms.temp_worker.permissions.punch_query",
+    "Agency Worker": "vcmhrms.agency_worker.permissions.worker_query",
+    "Agency Roster": "vcmhrms.agency_worker.permissions.roster_query",
+    "Agency Attendance": "vcmhrms.agency_worker.permissions.attendance_query",
+    "Agency Punch": "vcmhrms.agency_worker.permissions.punch_query",
     # "Employee": "vcmhrms.vcm_hrms.utilities.access_guard.employee_permission_query",
 }
 
@@ -159,10 +159,10 @@ has_permission = {
     "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
 }
 
-has_permission.update({name: "vcmhrms.temp_worker.permissions.has_permission" for name in (
-    "Temp Worker", "Temp Roster", "Temp Attendance", "Temp Punch")})
+has_permission.update({name: "vcmhrms.agency_worker.permissions.has_permission" for name in (
+    "Agency Worker", "Agency Roster", "Agency Attendance", "Agency Punch")})
 
-after_migrate = ["vcmhrms.temp_worker.setup.after_migrate"]
+after_migrate = ["vcmhrms.agency_worker.setup.after_migrate"]
 
 # DocType Class
 # ---------------
@@ -222,8 +222,8 @@ doc_events = {
 # ---------------
 scheduler_events = {
     "cron": {
-        "0 4 * * *": ["vcmhrms.temp_worker.api.finalize_pending_attendance"],
-        "0 16 * * *": ["vcmhrms.temp_worker.api.finalize_pending_attendance"]
+        "0 4 * * *": ["vcmhrms.agency_worker.api.finalize_pending_attendance"],
+        "0 16 * * *": ["vcmhrms.agency_worker.api.finalize_pending_attendance"]
     }
 }
 # scheduler_events = {
@@ -322,4 +322,5 @@ override_whitelisted_methods = {
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
+
 

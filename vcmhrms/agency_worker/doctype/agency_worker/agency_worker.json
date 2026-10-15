@@ -1,0 +1,168 @@
+{
+  "doctype": "DocType",
+  "name": "Agency Worker",
+  "module": "Agency Worker",
+  "engine": "InnoDB",
+  "istable": 0,
+  "track_changes": 1,
+  "title_field": "worker_name",
+  "show_title_field_in_link": 1,
+  "search_fields": "worker_name, staff_id, smartoffice_id, agency",
+  "fields": [
+    {
+      "fieldname": "worker_name",
+      "label": "Agency Staff Name",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "staff_id",
+      "label": "Agency Staff ID",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "smartoffice_id",
+      "label": "Biometric Code",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "agency",
+      "oldfieldname": "contractor",
+      "label": "Agency",
+      "fieldtype": "Link",
+      "options": "Agency",
+      "reqd": 1,
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "worker_role",
+      "label": "Role",
+      "fieldtype": "Data",
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "department",
+      "label": "Department",
+      "fieldtype": "Link",
+      "options": "Department",
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "budget_location",
+      "oldfieldname": "branch",
+      "label": "Budget Location",
+      "fieldtype": "Link",
+      "reqd": 1,
+      "options": "Budget Location",
+      "default": "VRN"
+    },
+    {
+      "fieldname": "roster_assignment_section",
+      "label": "Assignments",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "roster_managers",
+      "label": "Roster Managers",
+      "fieldtype": "Table",
+      "options": "Agency Worker Roster Manager"
+    },
+    {
+      "fieldname": "supervisor_column",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "supervisors",
+      "label": "Supervisors",
+      "fieldtype": "Table",
+      "options": "Agency Worker Supervisor"
+    },
+    {
+      "fieldname": "active_from",
+      "label": "Active From",
+      "fieldtype": "Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "active_until",
+      "label": "Active Until",
+      "fieldtype": "Date"
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "default": "Active",
+      "reqd": 1,
+      "options": "Active\nInactive"
+    }
+  ],
+  "field_order": [
+    "worker_name",
+    "staff_id",
+    "smartoffice_id",
+    "agency",
+    "worker_role",
+    "department",
+    "budget_location",
+    "roster_assignment_section",
+    "roster_managers",
+    "supervisor_column",
+    "supervisors",
+    "active_from",
+    "active_until",
+    "status"
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1
+    },
+    {
+      "role": "Agency Worker Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1
+    },
+    {
+      "role": "ERP Manager",
+      "read": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1
+    },
+    {
+      "role": "Agency Roster Manager",
+      "read": 1
+    },
+    {
+      "role": "Agency Worker Supervisor",
+      "read": 1,
+      "report": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "actions": [],
+  "links": [],
+  "states": []
+}
+

@@ -1,0 +1,20 @@
+{
+  "doctype": "Page",
+  "name": "ag-monthly-roster",
+  "page_name": "ag-monthly-roster",
+  "title": "Agency Monthly Roster",
+  "module": "Agency Worker",
+  "standard": "Yes",
+  "roles": [
+    {
+      "role": "System Manager"
+    },
+    {
+      "role": "Agency Worker Manager"
+    },
+    {
+      "role": "Agency Roster Manager"
+    }
+  ]
+}
+

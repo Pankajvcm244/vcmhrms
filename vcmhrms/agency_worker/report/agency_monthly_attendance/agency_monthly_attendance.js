@@ -1,0 +1,35 @@
+frappe.query_reports['Agency Monthly Attendance'] = {
+    onload(report) {
+        report.page.add_inner_button(__('Attendance Review'),()=>frappe.set_route('ag-attend-review'));
+        report.page.add_inner_button(__('OT Approval'),()=>frappe.set_route('ag-ot-approval'));
+        if (frappe.user_roles.includes('System Manager') || frappe.user_roles.includes('Agency Worker Manager')) {
+            report.page.add_inner_button(__('Lock Completed Period'),()=>frappe.confirm(
+                __('Lock this 26th–25th attendance period? Nobody will be able to change its roster, attendance, OT or punch reviews.'),
+                async ()=> {
+                    const {message}=await frappe.call({method:'vcmhrms.agency_worker.period_lock.lock_period',type:'POST',
+                        args:{month:frappe.query_report.get_filter_value('month'),
+                            budget_location:frappe.query_report.get_filter_value('budget_location')},freeze:true});
+                    frappe.msgprint(message.already_locked?__('This period is already locked.'):__('Attendance period locked.'));
+                }));
+        }
+    },
+    filters: [
+        {fieldname:'month',label:'Payroll Month (MM-YYYY)',fieldtype:'Data',reqd:1,
+            default:(()=>{const value=frappe.datetime.get_today(); return `${value.slice(5,7)}-${value.slice(0,4)}`;})()},
+        {fieldname:'budget_location',label:'Budget Location',fieldtype:'Link',options:'Budget Location',default:'VRN',reqd:1},
+        {fieldname:'agency',label:'Agency',fieldtype:'Link',options:'Agency'},
+        {fieldname:'department',label:'Department',fieldtype:'Link',options:'Department'},
+        {fieldname:'supervisor',label:'Supervisor (blank = All)',fieldtype:'Link',options:'User',
+            get_query:()=>({query:'vcmhrms.agency_worker.report.agency_monthly_attendance.agency_monthly_attendance.get_supervisors'})}
+    ],
+    formatter(value,row,column,data,default_formatter) {
+        value=default_formatter(value,row,column,data);
+        if (!column.fieldname.startsWith('day_')) return value;
+        const raw=String(data[column.fieldname] || '');
+        if (raw.startsWith('H')) return `<span style="color:${data.holiday_colour || '#6f42c1'};font-weight:600">${value}</span>`;
+        if (raw.startsWith('A') || raw.startsWith('NR')) return `<span style="color:#c0392b;font-weight:600">${value}</span>`;
+        if (raw.startsWith('HD') || raw.startsWith('PD')) return `<span style="color:#b7791f;font-weight:600">${value}</span>`;
+        if (raw.startsWith('P') || raw.includes('✓')) return `<span style="color:#26734d">${value}</span>`;
+        return value;
+    }
+};

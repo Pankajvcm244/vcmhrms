@@ -1,0 +1,7 @@
+{
+  "doctype": "Page", "name": "ag-punch-simulator",
+  "page_name": "ag-punch-simulator", "title": "Agency Punch Simulator",
+  "module": "Agency Worker", "standard": "Yes",
+  "roles": [{"role": "System Manager"}, {"role": "ERP Manager"}]
+}
+

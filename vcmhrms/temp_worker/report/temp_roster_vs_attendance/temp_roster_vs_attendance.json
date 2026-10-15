@@ -1,6 +1,0 @@
-{
- "doctype":"Report", "name":"Temp Roster vs Attendance",
- "report_name":"Temp Roster vs Attendance", "ref_doctype":"Temp Roster",
- "report_type":"Script Report", "is_standard":"Yes", "module":"Temp Worker",
- "roles":[{"role":"System Manager"},{"role":"Temp Worker Manager"},{"role":"Temp Worker Supervisor"}]
-}

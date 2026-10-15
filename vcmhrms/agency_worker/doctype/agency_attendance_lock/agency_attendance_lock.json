@@ -1,0 +1,83 @@
+{
+  "doctype": "DocType",
+  "module": "Agency Worker",
+  "engine": "InnoDB",
+  "track_changes": 1,
+  "actions": [],
+  "links": [],
+  "states": [],
+  "name": "Agency Attendance Lock",
+  "autoname": "format:AGENCYLOCK-{budget_location}-{period_end}",
+  "title_field": "period_label",
+  "fields": [
+    {
+      "fieldname": "period_label",
+      "label": "Period",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "period_start",
+      "label": "From Date",
+      "fieldtype": "Date",
+      "reqd": 1,
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "period_end",
+      "label": "To Date",
+      "fieldtype": "Date",
+      "reqd": 1,
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "budget_location",
+      "label": "Budget Location",
+      "fieldtype": "Link",
+      "options": "Budget Location",
+      "reqd": 1,
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "locked_by",
+      "label": "Locked By",
+      "fieldtype": "Link",
+      "options": "User",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "locked_at",
+      "label": "Locked At",
+      "fieldtype": "Datetime",
+      "read_only": 1,
+      "in_list_view": 1
+    }
+  ],
+  "field_order": [
+    "period_label",
+    "period_start",
+    "period_end",
+    "budget_location",
+    "locked_by",
+    "locked_at"
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "report": 1
+    },
+    {
+      "role": "Agency Worker Manager",
+      "read": 1,
+      "report": 1
+    }
+  ]
+}
+

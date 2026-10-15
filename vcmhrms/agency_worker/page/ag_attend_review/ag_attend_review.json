@@ -1,0 +1,6 @@
+{
+  "doctype":"Page", "name":"ag-attend-review", "page_name":"ag-attend-review",
+  "title":"Agency Attendance Review", "module":"Agency Worker", "standard":"Yes",
+  "roles":[{"role":"System Manager"},{"role":"Agency Worker Supervisor"}]
+}
+
