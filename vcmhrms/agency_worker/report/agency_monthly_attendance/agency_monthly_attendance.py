@@ -74,11 +74,14 @@ def execute(filters=None):
             join `tabAgency Attendance Duty` d on d.parent=a.name where r.name in ({placeholders})""",tuple(roster_names),as_dict=True)
         for x in records: by_day[(x.worker,getdate(x.roster_date))].append(x)
         offs={(r.worker,getdate(r.roster_date)) for r in rosters if r.day_type=='Weekly Off'}
-    agency_meta={x.name:x for x in frappe.get_all('Agency',fields=['name','holiday_list','holiday_colour'])}
+    agency_meta={x.name:x for x in frappe.get_all('Agency',fields=['name','agency_holiday_list','holiday_colour'])}
     holidays=defaultdict(set)
     for name,meta in agency_meta.items():
-        if meta.holiday_list:
-            holidays[name]=set(getdate(x.holiday_date) for x in frappe.get_all('Holiday',filters={'parent':meta.holiday_list,'holiday_date':['between',[start,end]]},fields=['holiday_date']))
+        if meta.agency_holiday_list:
+            holidays[name]=set(getdate(x.holiday_date) for x in frappe.get_all(
+                'Agency Holiday',filters={'parent':meta.agency_holiday_list,
+                    'parenttype':'Agency Holiday List','holiday_date':['between',[start,end]]},
+                fields=['holiday_date']))
     data=[]
     for worker in workers:
         row=frappe._dict(**worker,present_days=0,half_days=0,absent_days=0,approved_ot=0,

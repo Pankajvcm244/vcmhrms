@@ -1,0 +1,55 @@
+{
+  "doctype": "DocType",
+  "name": "Agency Holiday List",
+  "module": "Agency Worker",
+  "engine": "InnoDB",
+  "autoname": "field:holiday_list_name",
+  "title_field": "holiday_list_name",
+  "track_changes": 1,
+  "fields": [
+    {
+      "fieldname": "holiday_list_name",
+      "label": "Agency Holiday List",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "holidays",
+      "label": "Agency Holidays",
+      "fieldtype": "Table",
+      "options": "Agency Holiday",
+      "reqd": 1
+    },
+    {
+      "fieldname": "disabled",
+      "label": "Disabled",
+      "fieldtype": "Check",
+      "default": "0",
+      "in_list_view": 1
+    }
+  ],
+  "field_order": ["holiday_list_name", "holidays", "disabled"],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1
+    },
+    {
+      "role": "Agency Worker Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1
+    }
+  ],
+  "actions": [],
+  "links": [],
+  "states": []
+}

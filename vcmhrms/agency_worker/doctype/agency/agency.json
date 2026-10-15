@@ -20,10 +20,10 @@
       "in_list_view": 1
     },
     {
-      "fieldname": "holiday_list",
-      "label": "Special Holiday List",
+      "fieldname": "agency_holiday_list",
+      "label": "Agency Holiday List",
       "fieldtype": "Link",
-      "options": "Holiday List",
+      "options": "Agency Holiday List",
       "in_list_view": 1
     },
     {
@@ -42,7 +42,7 @@
   ],
   "field_order": [
     "agency_name",
-    "holiday_list",
+    "agency_holiday_list",
     "holiday_colour",
     "disabled"
   ],

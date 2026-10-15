@@ -3,9 +3,9 @@ frappe.ui.form.on('Agency Roster', {
         if (frappe.user_roles.includes('System Manager') || frappe.user_roles.includes('ERP Manager')) {
             frm.add_custom_button(__('Punch Simulator'), () => frappe.set_route('ag-punch-simulator'));
         }
-        if (frappe.user_roles.includes('System Manager') || frappe.user_roles.includes('Agency Worker Manager')) {
+        if (frappe.user_roles.includes('System Manager') || frappe.user_roles.includes('Agency Worker Supervisor')) {
             frm.add_custom_button(__('Bulk OT Approval'), () => frappe.set_route('ag-ot-approval'));
-            frm.add_custom_button(__('Attendance Review'), () => frappe.set_route('ag-attend-review-page'));
+            frm.add_custom_button(__('Attendance Review'), () => frappe.set_route('ag-attend-review'));
         }
         if (!frm.is_new()) frm.add_custom_button(__('Recalculate Attendance'), async () => {
             const result = await frappe.call({method: 'vcmhrms.agency_worker.service.recalculate_attendance', args: {roster: frm.doc.name}});
