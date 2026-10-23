@@ -167,7 +167,6 @@ Attendance, Shift Type, or Holiday List records.
 {
   "punches": [
     {
-      "staff_id": "AGENCY-001",
       "biometric_code": "990001",
       "punch_time": "2026-10-11T08:45:00",
       "device_id": "DEVICE-1",
@@ -177,8 +176,8 @@ Attendance, Shift Type, or Holiday List records.
 }
 ```
 
-- `staff_id`, `biometric_code`, and `punch_time` are required.
-- Staff ID and Biometric Code must identify the same active Agency Worker.
+- `biometric_code` and `punch_time` are required. The API resolves the Agency Worker
+  from the globally unique Biometric Code; vendors do not send Staff ID.
 - For the India-only rollout, an offset-free timestamp is interpreted in the site's
   configured Asia/Kolkata timezone.
 - ISO 8601 timestamps carrying an offset are converted into the site timezone.
@@ -187,7 +186,7 @@ Attendance, Shift Type, or Holiday List records.
 
 ### 8.3 Idempotency and immutability
 
-- Event identity is derived from Staff ID, Biometric Code, and normalized punch time.
+- Event identity is derived from Biometric Code and normalized punch time.
 - Retrying the same punch returns `duplicate` and must not create another record.
 - Original punches are directionless, immutable, and cannot be edited or deleted.
 - Old punches may arrive late and must recalculate nearby unlocked rosters.

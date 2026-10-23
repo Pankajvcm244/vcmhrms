@@ -38,19 +38,17 @@ def ingest_payload(payload, simulated=False):
         savepoint=f'workforce_{index}'
         frappe.db.savepoint(savepoint)
         try:
-            staff_id=str(row.get('staff_id') or '').strip()
             biometric_code=str(row.get('biometric_code') or '').strip()
-            if not staff_id or not biometric_code or not row.get('punch_time'):
-                frappe.throw('staff_id, biometric_code and punch_time are required.')
-            worker=frappe.db.get_value('Agency Worker',
-                {'staff_id':staff_id,'smartoffice_id':biometric_code},'name')
+            if not biometric_code or not row.get('punch_time'):
+                frappe.throw('biometric_code and punch_time are required.')
+            worker=frappe.db.get_value('Agency Worker',{'smartoffice_id':biometric_code},'name')
             if not worker:
-                frappe.throw('Staff ID and Biometric Code do not identify the same Agency Worker.')
+                frappe.throw('Biometric Code does not identify an Agency Worker.')
             time=timestamp(row.get('punch_time'))
             if time>now_datetime(): frappe.throw('Future punch not accepted.')
             # Stable internal event identity makes provider retries idempotent without
             # requiring the provider to understand or supply an event ID.
-            event_id='BIO-'+sha256(f'{staff_id}|{biometric_code}|{time.isoformat()}'.encode()).hexdigest()[:40]
+            event_id='BIO-'+sha256(f'{biometric_code}|{time.isoformat()}'.encode()).hexdigest()[:40]
             existing=frappe.db.get_value('Agency Punch',{'event_id':event_id},['name','worker','punch_time'],as_dict=True)
             if existing:
                 if existing.worker!=worker or get_datetime(existing.punch_time)!=time:

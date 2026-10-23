@@ -28,15 +28,15 @@ frappe.pages['ag-punch-simulator'].on_page_load = function(wrapper) {
             frappe.throw(__('JSON must contain between 1 and 500 punches.'));
         }
         for (const row of payload.punches) {
-            if (!row || typeof row!=='object' || Array.isArray(row) || !row.staff_id || !row.biometric_code || !row.punch_time) {
-                frappe.throw(__('Each punch requires Staff ID, Biometric Code and Punch Time.'));
+            if (!row || typeof row!=='object' || Array.isArray(row) || !row.biometric_code || !row.punch_time) {
+                frappe.throw(__('Each punch requires Biometric Code and Punch Time.'));
             }
         }
         return payload;
     }
     function renderPreview(payload) {
-        preview.html(`<h5>${payload.punches.length} punches to submit</h5><table class="table table-bordered"><thead><tr><th>Staff ID</th><th>Biometric Code</th><th>Timestamp</th><th>Device</th><th>Location</th></tr></thead><tbody>`+
-            payload.punches.map(row=>'<tr>'+[row.staff_id,row.biometric_code,row.punch_time,row.device_id,row.location].map(v=>`<td>${esc(v)}</td>`).join('')+'</tr>').join('')+'</tbody></table>');
+        preview.html(`<h5>${payload.punches.length} punches to submit</h5><table class="table table-bordered"><thead><tr><th>Biometric Code</th><th>Timestamp</th><th>Device</th><th>Location</th></tr></thead><tbody>`+
+            payload.punches.map(row=>'<tr>'+[row.biometric_code,row.punch_time,row.device_id,row.location].map(v=>`<td>${esc(v)}</td>`).join('')+'</tr>').join('')+'</tbody></table>');
     }
     let inputMode='table', builtSignature='';
     async function buildPreview() {

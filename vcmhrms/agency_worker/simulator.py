@@ -23,7 +23,7 @@ def prepare_manual_punches(worker,punch_times):
     times=sorted(get_datetime(value) for value in punch_times)
     if any(time>now_datetime() for time in times):frappe.throw('Choose past punch times.')
     timezone=ZoneInfo(get_system_timezone())
-    punches=[dict(staff_id=doc.staff_id,biometric_code=doc.smartoffice_id,
+    punches=[dict(biometric_code=doc.smartoffice_id,
         punch_time=time.replace(tzinfo=timezone).isoformat(),device_id='SIMULATOR',location=doc.budget_location)
         for time in times]
     return dict(punches=punches)
@@ -51,9 +51,8 @@ def submit_sample(payload, worker):
     # Enforce one selected worker on the server, including uploaded/edited JSON.
     for row in payload['punches']:
         if not isinstance(row,dict): frappe.throw('Every punch must be a JSON object.')
-        if (str(row.get('staff_id') or '').strip()!=doc.staff_id or
-                str(row.get('biometric_code') or '').strip()!=doc.smartoffice_id):
-            frappe.throw('Every punch must contain the selected worker Staff ID and Biometric Code.')
+        if str(row.get('biometric_code') or '').strip()!=doc.smartoffice_id:
+            frappe.throw('Every punch must contain the selected worker Biometric Code.')
     payload=dict(payload)
     return ingest_payload(payload,simulated=True)
 
