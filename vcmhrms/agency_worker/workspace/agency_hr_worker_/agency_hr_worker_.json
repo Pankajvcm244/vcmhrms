@@ -1,0 +1,280 @@
+{
+  "charts": [],
+  "content": "[{\"id\":\"D1O264D5xQ\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">VCM HRMS</span>\",\"col\":12}},{\"id\":\"teaphE1koM\",\"type\":\"card\",\"data\":{\"card_name\":\"HRMS Documents\",\"col\":4}},{\"id\":\"grZmRIpUmA\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Agency</b></span>\",\"col\":12}},{\"id\":\"IeQQZe1lr6\",\"type\":\"card\",\"data\":{\"card_name\":\"Agency Reports\",\"col\":4}},{\"id\":\"xeli8ZghVv\",\"type\":\"card\",\"data\":{\"card_name\":\"Supervisor Actions\",\"col\":4}},{\"id\":\"RDJo-8qMzv\",\"type\":\"card\",\"data\":{\"card_name\":\"Agency Setup\",\"col\":4}},{\"id\":\"oWJCH-n_px\",\"type\":\"card\",\"data\":{\"card_name\":\"Agency Operations\",\"col\":4}},{\"id\":\"DHepon2lgS\",\"type\":\"card\",\"data\":{\"card_name\":\"Roster Actions\",\"col\":4}}]",
+  "creation": "2026-10-15 06:05:09.220123",
+  "custom_blocks": [],
+  "docstatus": 0,
+  "doctype": "Workspace",
+  "for_user": "",
+  "hide_custom": 0,
+  "icon": "share-people",
+  "idx": 0,
+  "indicator_color": "green",
+  "is_hidden": 0,
+  "label": "Agency HR Worker",
+  "links": [
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "HRMS Documents",
+      "link_count": 4,
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Card Break"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Advance Salary",
+      "link_count": 0,
+      "link_to": "Advance Salary",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Double Duty",
+      "link_count": 0,
+      "link_to": "Double Duty",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Special Concession",
+      "link_count": 0,
+      "link_to": "Special Concession",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "VCM HR Settings",
+      "link_count": 0,
+      "link_to": "VCM HR Settings",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Reports",
+      "link_count": 2,
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Card Break"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 1,
+      "label": "Monthly Attendance",
+      "link_count": 0,
+      "link_to": "Agency Monthly Attendance",
+      "link_type": "Report",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 1,
+      "label": "Roster vs Attendance",
+      "link_count": 0,
+      "link_to": "Agency Roster vs Attendance",
+      "link_type": "Report",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Supervisor Actions",
+      "link_count": 2,
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Card Break"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Attendance Review",
+      "link_count": 0,
+      "link_to": "ag-attend-review",
+      "link_type": "Page",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "OT Approval",
+      "link_count": 0,
+      "link_to": "ag-ot-approval",
+      "link_type": "Page",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Operations",
+      "link_count": 4,
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Card Break"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Rosters",
+      "link_count": 0,
+      "link_to": "Agency Roster",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Punch",
+      "link_count": 0,
+      "link_to": "Agency Punch",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Attendance",
+      "link_count": 0,
+      "link_to": "Agency Attendance",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Attendance Lock",
+      "link_count": 0,
+      "link_to": "Agency Attendance Lock",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Roster Actions",
+      "link_count": 2,
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Card Break"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Monthly Roster",
+      "link_count": 0,
+      "link_to": "ag-monthly-roster",
+      "link_type": "Page",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Punch Simulator",
+      "link_count": 0,
+      "link_to": "ag-punch-simulator",
+      "link_type": "Page",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Setup",
+      "link_count": 4,
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Card Break"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency",
+      "link_count": 0,
+      "link_to": "Agency",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Shifts",
+      "link_count": 0,
+      "link_to": "Agency Shift",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Worker",
+      "link_count": 0,
+      "link_to": "Agency Worker",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Agency Holiday List",
+      "link_count": 0,
+      "link_to": "Agency Holiday List",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    }
+  ],
+  "modified": "2026-10-15 06:37:38.648111",
+  "modified_by": "Administrator",
+  "module": "Agency Worker",
+  "name": "Agency HR Worker",
+  "number_cards": [],
+  "owner": "Administrator",
+  "parent_page": "",
+  "public": 1,
+  "quick_lists": [],
+  "roles": [
+    {
+      "role": "System Manager"
+    },
+    {
+      "role": "Agency Worker Manager"
+    },
+    {
+      "role": "Agency Roster Manager"
+    },
+    {
+      "role": "Agency Worker Supervisor"
+    },
+    {
+      "role": "ERP Manager"
+    }
+  ],
+  "sequence_id": 58.3,
+  "shortcuts": [],
+  "title": "Agency HR Worker"
+}

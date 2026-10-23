@@ -42,6 +42,10 @@ Attendance, Shift Type, or Holiday List records.
 
 ## 4. Roles and authorization
 
+- Agency pages and reports list all Agency Desk roles so Page/Report metadata does not
+  override Role Permissions Manager. DocType permissions and server-side action checks
+  determine what each user can view or change.
+
 ### 4.1 System Manager
 
 - Acts as an operational backup.
@@ -140,6 +144,9 @@ Attendance, Shift Type, or Holiday List records.
   same date or month.
 
 ## 7. Roster rules
+
+- Monthly Roster filters include Agency Staff Name, Agency, Budget Location, and month.
+  Staff and Agency filtering is applied by the server before roster rows are returned.
 
 1. Only one Agency Roster may exist for a worker and roster date.
 2. A Duty roster must have at least one duty. A Weekly Off roster must have no duty.
@@ -265,7 +272,9 @@ Attendance, Shift Type, or Holiday List records.
 ## 13. Monthly attendance report
 
 - The month filter uses `MM-YYYY` and covers the 26th through the 25th.
-- Filters include Budget Location, Agency, Department, and Supervisor.
+- Filters include Budget Location, Agency, Department, Agency Staff Name, and Supervisor.
+- The report note explains every displayed abbreviation: P, HD, A, OFF, PD, NR, L,
+  E, the no-roster dash, the completion tick, and agency-holiday colour.
 - Agency Worker Manager and System Manager may select All or a specific Supervisor.
 - Monthly report access follows Role Permissions Manager. The Supervisor filter is
   a reporting filter and does not grant or remove document permissions.
@@ -395,3 +404,5 @@ regression cases and must not be reintroduced:
 5. A disabled Agency Holiday List is still applied by the monthly report and can remain
    linked to an Agency.
 
+
+- Roster vs Attendance filters include date range, Budget Location, Agency, Department, Agency Staff Name, Shift, Duty / Off, and Attendance Status.

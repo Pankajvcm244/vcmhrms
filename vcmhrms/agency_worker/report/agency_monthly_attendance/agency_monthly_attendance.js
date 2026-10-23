@@ -28,7 +28,22 @@ frappe.query_reports['Agency Monthly Attendance'] = {
             default:(()=>{const value=frappe.datetime.get_today(); const names=['January','February','March','April','May','June','July','August','September','October','November','December']; const number=value.slice(5,7); return `${number} - ${names[Number(number)-1]}`;})()},
         {fieldname:'budget_location',label:'Budget Location',fieldtype:'Link',options:'Budget Location',default:'VRN',reqd:1},
         {fieldname:'agency',label:'Agency',fieldtype:'Link',options:'Agency'},
-        {fieldname:'department',label:'Department',fieldtype:'Link',options:'Department'},
+        {fieldname:'department',label:'Department',fieldtype:'Select',options:`
+HKM- Operation Housekeeping
+TSF- Matchless Gift Shop
+HKMV- Operation Security
+TSF- Braj Nidhi Guest House
+HKMV- Borewell
+TSF- Annakoot
+Pest Control
+Maintenance
+MK Maintenance
+RO Maintenance
+MK Security`},
+        {fieldname:'worker',label:'Agency Staff Name',fieldtype:'Link',options:'Agency Worker',
+            get_query:()=>({filters:{budget_location:frappe.query_report.get_filter_value('budget_location'),
+                agency:frappe.query_report.get_filter_value('agency') || undefined,
+                department:frappe.query_report.get_filter_value('department') || undefined,status:'Active'}})},
         {fieldname:'supervisor',label:'Supervisor (blank = All)',fieldtype:'Link',options:'User',
             get_query:()=>({query:'vcmhrms.agency_worker.report.agency_monthly_attendance.agency_monthly_attendance.get_supervisors'})}
     ],

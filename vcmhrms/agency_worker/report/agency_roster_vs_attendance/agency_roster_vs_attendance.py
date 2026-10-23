@@ -8,7 +8,7 @@ def execute(filters=None):
     if not filters.budget_location or not filters.from_date or not filters.to_date:
         frappe.throw('Budget Location and date range are required.')
     check_budget_location(filters.budget_location)
-    specs=[('worker_name','Agency Staff Name','Data',None),('worker','Agency Worker','Link','Agency Worker'),
+    specs=[('worker_name','Agency Staff Name','Data',None),
         ('staff_id','Agency Staff ID','Data',None),('agency','Agency','Link','Agency'),('date','Date','Date',None),
         ('day_type','Duty / Off','Data',None),('shift','Shift','Data',None),('planned_start','Planned Start','Data',None),
         ('planned_end','Planned End','Data',None),('first_in','Inferred IN','Data',None),
@@ -25,8 +25,18 @@ def execute(filters=None):
         ('status','Status','Data',None),('exception','Exception','Data',None)]
     columns=[dict(fieldname=f,label=l,fieldtype=t,options=o,width=140) for f,l,t,o in specs]
     data=[]
-    for item in frappe.get_list('Agency Roster',filters={'budget_location':filters.budget_location,
-        'roster_date':['between',[filters.from_date,filters.to_date]]},fields=['name'],limit_page_length=0):
+    roster_filters={'budget_location':filters.budget_location,
+        'roster_date':['between',[filters.from_date,filters.to_date]]}
+    worker_filters={}
+    if filters.worker: worker_filters['name']=filters.worker
+    if filters.agency: worker_filters['agency']=filters.agency
+    if filters.department: worker_filters['department']=filters.department
+    if worker_filters:
+        agency_workers=frappe.get_all('Agency Worker',filters=worker_filters,pluck='name')
+        if not agency_workers: return columns,[]
+        roster_filters['worker']=['in',agency_workers]
+    if filters.day_type: roster_filters['day_type']=filters.day_type
+    for item in frappe.get_list('Agency Roster',filters=roster_filters,fields=['name'],limit_page_length=0):
         roster=frappe.get_doc('Agency Roster',item.name)
         name=frappe.db.get_value('Agency Attendance',{'roster':roster.name})
         attendance=frappe.get_doc('Agency Attendance',name) if name else None
@@ -41,9 +51,13 @@ def execute(filters=None):
             pluck='punch_time',order_by='punch_time')
         nearby_punches=', '.join(format_datetime(value,'dd-MM-yyyy HH:mm') for value in raw_punches)
         if not roster.duties:
-            data.append(dict(base,status='Weekly Off',exception=attendance.review_notes if attendance else ''))
+            if not filters.shift and (not filters.status or filters.status=='Weekly Off'):
+                data.append(dict(base,status='Weekly Off',exception=attendance.review_notes if attendance else ''))
         for duty in roster.duties:
+            if filters.shift and duty.shift!=filters.shift: continue
             result=results.get(duty.name,frappe._dict())
+            result_status=result.status or 'Pending'
+            if filters.status and filters.status!=result_status: continue
             exception=result.exception or ''
             if raw_punches and not result.first_in and not result.last_out:
                 exception='Punches exist outside the planned duty/OT matching window.'

@@ -8,16 +8,22 @@ from frappe.utils import get_datetime
 
 
 @frappe.whitelist()
-def get_month(month,budget_location):
+def get_month(month,budget_location,worker=None,agency=None):
     check_budget_location(budget_location)
     try: start=getdate(datetime.strptime(str(month),'%m-%Y').date().replace(day=1))
     except (TypeError,ValueError): frappe.throw('Enter month as MM-YYYY, for example 10-2026.')
     end=date(start.year,start.month,monthrange(start.year,start.month)[1])
-    workers=frappe.get_list('Agency Worker',filters={'budget_location':budget_location,'status':'Active'},
+    worker_filters={'budget_location':budget_location,'status':'Active'}
+    if worker: worker_filters['name']=worker
+    if agency: worker_filters['agency']=agency
+    workers=frappe.get_list('Agency Worker',filters=worker_filters,
         fields=['name','worker_name','staff_id','agency','worker_role','department','budget_location'],
         limit_page_length=0,order_by='worker_name')
+    worker_names=[row.name for row in workers]
+    if not worker_names: return dict(workers=[],rosters=[],days=end.day)
     rosters=frappe.get_list('Agency Roster',filters={'budget_location':budget_location,
-        'roster_date':['between',[start,end]]},fields=['name','worker','roster_date','day_type'],limit_page_length=0)
+        'worker':['in',worker_names],'roster_date':['between',[start,end]]},
+        fields=['name','worker','roster_date','day_type'],limit_page_length=0)
     for row in rosters:
         row['shifts']=[d.shift for d in frappe.get_doc('Agency Roster',row.name).duties]
     return dict(workers=workers,rosters=rosters,days=end.day)

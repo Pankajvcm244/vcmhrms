@@ -1,7 +1,26 @@
 {
- "doctype":"Report", "name":"Agency Roster vs Attendance",
- "report_name":"Agency Roster vs Attendance", "ref_doctype":"Agency Roster",
- "report_type":"Script Report", "is_standard":"Yes", "module":"Agency Worker",
- "roles":[{"role":"System Manager"},{"role":"Agency Worker Manager"},{"role":"Agency Worker Supervisor"}]
+  "doctype": "Report",
+  "name": "Agency Roster vs Attendance",
+  "report_name": "Agency Roster vs Attendance",
+  "ref_doctype": "Agency Roster",
+  "report_type": "Script Report",
+  "is_standard": "Yes",
+  "module": "Agency Worker",
+  "roles": [
+    {
+      "role": "System Manager"
+    },
+    {
+      "role": "Agency Worker Manager"
+    },
+    {
+      "role": "Agency Roster Manager"
+    },
+    {
+      "role": "Agency Worker Supervisor"
+    },
+    {
+      "role": "ERP Manager"
+    }
+  ]
 }
-

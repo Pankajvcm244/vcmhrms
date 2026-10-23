@@ -55,6 +55,7 @@ def execute(filters=None):
     if filters.budget_location: conditions.append('w.budget_location=%(location)s'); values['location']=filters.budget_location
     if filters.agency: conditions.append('w.agency=%(agency)s'); values['agency']=filters.agency
     if filters.department: conditions.append('w.department=%(department)s'); values['department']=filters.department
+    if filters.worker: conditions.append('w.name=%(worker)s'); values['worker']=filters.worker
     supervisor=filters.supervisor
     if supervisor:
         conditions.append("""exists(select 1 from `tabAgency Worker Supervisor` s
@@ -124,7 +125,11 @@ def execute(filters=None):
                 code+=flags+('' if pending else ' ✓')
             row[fieldname]=code
         row.approved_ot=round(row.approved_ot,2); data.append(row)
-    message=f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. ✓ means the supervisor has no pending punch or OT action. Agency holidays use the agency holiday colour.'
+    message=(f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. '
+        'Codes: P = Present; HD = Half Day; A = Absent; OFF = Weekly Off; '
+        'PD = Pending (shift or punch-capture window not completed); NR = Needs Review; '
+        'L = Late Entry; E = Early Exit; — = No roster. '
+        '✓ = no pending punch or OT action. Agency holidays use the agency holiday colour.')
     return columns,data,message
 
 

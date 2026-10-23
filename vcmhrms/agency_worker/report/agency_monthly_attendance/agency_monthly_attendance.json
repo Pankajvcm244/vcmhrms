@@ -7,8 +7,20 @@
   "is_standard": "Yes",
   "module": "Agency Worker",
   "roles": [
-    {"role": "System Manager"},
-    {"role": "Agency Worker Manager"}
+    {
+      "role": "System Manager"
+    },
+    {
+      "role": "Agency Worker Manager"
+    },
+    {
+      "role": "Agency Roster Manager"
+    },
+    {
+      "role": "Agency Worker Supervisor"
+    },
+    {
+      "role": "ERP Manager"
+    }
   ]
 }
-

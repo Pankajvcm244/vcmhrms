@@ -1,6 +1,25 @@
 {
-  "doctype":"Page", "name":"ag-ot-approval", "page_name":"ag-ot-approval",
-  "title":"Agency OT Approval", "module":"Agency Worker", "standard":"Yes",
-  "roles":[{"role":"System Manager"},{"role":"Agency Worker Supervisor"}]
+  "doctype": "Page",
+  "name": "ag-ot-approval",
+  "page_name": "ag-ot-approval",
+  "title": "Agency OT Approval",
+  "module": "Agency Worker",
+  "standard": "Yes",
+  "roles": [
+    {
+      "role": "System Manager"
+    },
+    {
+      "role": "Agency Worker Manager"
+    },
+    {
+      "role": "Agency Roster Manager"
+    },
+    {
+      "role": "Agency Worker Supervisor"
+    },
+    {
+      "role": "ERP Manager"
+    }
+  ]
 }
-

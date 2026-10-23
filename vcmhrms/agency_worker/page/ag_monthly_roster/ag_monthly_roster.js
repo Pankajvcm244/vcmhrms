@@ -3,6 +3,9 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
     const today=frappe.datetime.get_today();
     const month = page.add_field({fieldname:'month',label:'Month (MM-YYYY)',fieldtype:'Data',default:`${today.slice(5,7)}-${today.slice(0,4)}`});
     const budget_location = page.add_field({fieldname:'budget_location',label:'Budget Location',fieldtype:'Link',options:'Budget Location',default:'VRN'});
+    const agency = page.add_field({fieldname:'agency',label:'Agency',fieldtype:'Link',options:'Agency'});
+    const worker = page.add_field({fieldname:'worker',label:'Agency Staff Name',fieldtype:'Link',options:'Agency Worker',
+        get_query:()=>({filters:{budget_location:budget_location.get_value(),agency:agency.get_value() || undefined,status:'Active'}})});
     const body = $('<div style="overflow:auto"></div>').appendTo(page.main);
     const esc = value => frappe.utils.escape_html(String(value || ''));
     let loadedData=null;
@@ -50,7 +53,8 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
         if (!/^\d{2}-\d{4}$/.test(month.get_value()) || !budget_location.get_value()) return frappe.msgprint(__('Select a budget_location and enter MM-YYYY.'));
         const selectedMonth = month.get_value(), selectedBranch = budget_location.get_value();
         const [selectedMonthNumber,selectedYear]=selectedMonth.split('-');
-        const {message: data} = await frappe.call({method:'vcmhrms.agency_worker.roster.get_month',args:{month:selectedMonth,budget_location:selectedBranch}});
+        const {message: data} = await frappe.call({method:'vcmhrms.agency_worker.roster.get_month',args:{
+            month:selectedMonth,budget_location:selectedBranch,agency:agency.get_value(),worker:worker.get_value()}});
         loadedData=data;
         loadedMonth=selectedMonth;
         const lookup = new Map(data.rosters.map(r => [`${r.worker}|${String(r.roster_date).slice(0,10)}`,r]));
