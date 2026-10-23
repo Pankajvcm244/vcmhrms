@@ -1,5 +1,6 @@
 {
   "doctype": "DocType",
+  "allow_import": 1,
   "module": "Agency Worker",
   "engine": "InnoDB",
   "track_changes": 1,

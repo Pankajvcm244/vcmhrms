@@ -5,12 +5,8 @@ from vcmhrms.agency_worker.period_lock import is_locked
 
 
 def check_budget_location(budget_location):
-    if frappe.session.user == 'Administrator' or 'System Manager' in frappe.get_roles():
-        return
-    allowed = frappe.get_all('User Permission', filters={'user': frappe.session.user,
-        'allow': 'Budget Location'}, pluck='for_value')
-    if not allowed or budget_location not in allowed:
-        frappe.throw('A Budget Location User Permission is required for this location.', frappe.PermissionError)
+    """Compatibility hook; Agency access is controlled by roles and worker mappings."""
+    return
 
 
 def recalculate(roster):

@@ -1,12 +1,12 @@
 import frappe
 
 
-def budget_locations(user):
-    return frappe.get_all('User Permission',filters={'user':user,'allow':'Budget Location'},pluck='for_value')
-
-
 def unrestricted(user):
     return user=='Administrator' or 'System Manager' in frappe.get_roles(user)
+
+def can_view_all_workers(user):
+    roles=set(frappe.get_roles(user))
+    return unrestricted(user) or bool({'Agency Worker Manager','ERP Manager'} & roles)
 
 
 def _assigned(worker, child_doctype, user=None):
@@ -35,15 +35,29 @@ def require_supervisor(worker):
 
 def query(user=None, doctype=None):
     user=user or frappe.session.user
-    if unrestricted(user): return ''
-    allowed=budget_locations(user)
-    if not allowed: return '1=0'
-    values=','.join(frappe.db.escape(b) for b in allowed)
-    if doctype in ('Agency Worker','Agency Roster'):
-        return f'`tab{doctype}`.budget_location in ({values})'
+    if can_view_all_workers(user): return ''
+    roles=set(frappe.get_roles(user))
+    assignment_conditions=[]
+    escaped_user=frappe.db.escape(user)
+    if 'Agency Roster Manager' in roles:
+        assignment_conditions.append(
+            "exists(select 1 from `tabAgency Worker Roster Manager` rm "
+            "where rm.parent=`tabAgency Worker`.name and rm.parenttype='Agency Worker' "
+            f"and rm.user={escaped_user})")
+    if 'Agency Worker Supervisor' in roles:
+        assignment_conditions.append(
+            "exists(select 1 from `tabAgency Worker Supervisor` ws "
+            "where ws.parent=`tabAgency Worker`.name and ws.parenttype='Agency Worker' "
+            f"and ws.user={escaped_user})")
+    if not assignment_conditions: return '1=0'
+    worker_scope='select name from `tabAgency Worker` where ('+ ' or '.join(assignment_conditions) +')'
+    if doctype=='Agency Worker':
+        return f'`tabAgency Worker`.name in ({worker_scope})'
+    if doctype=='Agency Roster':
+        return f'`tabAgency Roster`.worker in ({worker_scope})'
     if doctype=='Agency Attendance':
-        return f'`tabAgency Attendance`.roster in (select name from `tabAgency Roster` where budget_location in ({values}))'
-    return f'`tabAgency Punch`.worker in (select name from `tabAgency Worker` where budget_location in ({values}))'
+        return f'`tabAgency Attendance`.roster in (select name from `tabAgency Roster` where worker in ({worker_scope}))'
+    return f'`tabAgency Punch`.worker in ({worker_scope})'
 
 
 def worker_query(user=None): return query(user,'Agency Worker')
@@ -55,19 +69,17 @@ def punch_query(user=None): return query(user,'Agency Punch')
 def has_permission(doc,user=None,permission_type=None,**kwargs):
     user=user or frappe.session.user
     if unrestricted(user): return None
-    if doc.doctype in ('Agency Worker','Agency Roster'):
-        budget_location=doc.budget_location
-    elif doc.doctype=='Agency Attendance':
-        budget_location=frappe.db.get_value('Agency Roster',doc.roster,'budget_location')
-    else:
-        budget_location=frappe.db.get_value('Agency Worker',doc.worker,'budget_location')
-    if budget_location not in budget_locations(user): return False
     roles=set(frappe.get_roles(user))
+    if doc.doctype=='Agency Worker' and {'Agency Worker Manager','ERP Manager'} & roles:
+        return None
     worker=doc.name if doc.doctype=='Agency Worker' else getattr(doc,'worker',None)
+    if worker and permission_type in (None,'read','select','report','export','print'):
+        if 'Agency Roster Manager' in roles and is_roster_manager(worker,user): return None
+        if 'Agency Worker Supervisor' in roles and is_supervisor(worker,user): return None
+        return False
     if worker and permission_type in ('write','create','delete','submit','cancel'):
         if doc.doctype=='Agency Roster' and 'Agency Roster Manager' in roles:
             return is_roster_manager(worker,user)
         if doc.doctype=='Agency Attendance' and 'Agency Worker Supervisor' in roles:
             return is_supervisor(worker,user)
     return None
-

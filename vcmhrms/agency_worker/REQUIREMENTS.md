@@ -51,16 +51,17 @@ Attendance, Shift Type, or Holiday List records.
 
 ### 4.2 Agency Worker Manager
 
-- May maintain Agency, Agency Holiday List, Agency Worker, and Agency Shift master
-  data within permitted Budget Locations.
+- May read, create, and maintain Agency, Agency Holiday List, Agency Worker, and
+  Agency Shift master data.
 - May run manual attendance finalization and lock a completed period.
-- May review Monthly Attendance for all workers in permitted Budget Locations and
+- May review Monthly Attendance for all workers and
   filter it by Supervisor, Agency, and Department.
 - This role does not replace worker-specific roster or supervisor mappings where a
   more restricted role is being used.
 
 ### 4.3 Agency Roster Manager
 
+- May read only Agency Workers to whom the user is mapped.
 - May create, replace, or update rosters only for Agency Workers to whom the user is
   mapped in `Agency Worker Roster Manager`.
 - May use single-worker allocation, bulk simple-shift allocation, weekly-off
@@ -69,6 +70,7 @@ Attendance, Shift Type, or Holiday List records.
 
 ### 4.4 Agency Worker Supervisor
 
+- May read only Agency Workers to whom the user is mapped.
 - May view and act on punch exceptions and OT only for Agency Workers to whom the
   user is mapped in `Agency Worker Supervisor`.
 - Multiple supervisors may be mapped to the same Agency Worker.
@@ -83,10 +85,20 @@ Attendance, Shift Type, or Holiday List records.
 - Must not gain roster, attendance review, OT approval, master-data, report, or
   period-lock access from this role.
 
-### 4.6 Budget Location
+### 4.6 ERP Manager
 
-- Operational access is constrained by `Budget Location` User Permission except for
-  Administrator/System Manager backup access.
+- Has full read, create, update, delete, report, export, print, email, and share access
+  to Agency Worker records.
+
+### 4.7 Data import
+
+- Every non-child Agency Worker DocType supports Data Import. Role permissions still
+  control which users may create or update each DocType.
+
+### 4.8 Budget Location
+
+- Budget Location is operational data and a report/roster filter. Agency Worker access
+  does not require a Budget Location User Permission.
 - `VRN` is the default Budget Location in user-facing Agency forms and pages.
 - Server-side checks are mandatory; hiding records or buttons in JavaScript is not
   sufficient authorization.
@@ -337,7 +349,7 @@ Every change to `vcmhrms/agency_worker` should verify at least:
     Replace Existing and reports failures.
 18. Roster Manager and Supervisor cannot act on unmapped workers, including by
     changing request parameters or report filters.
-19. Budget Location User Permission is enforced server-side.
+19. Agency Worker access does not depend on Budget Location User Permission.
 20. Agency holidays do not query regular HRMS Holiday List records.
 21. A holiday date retains its real attendance/OT/pending state, receives the configured
     holiday colour, and does not display an `H` holiday marker.

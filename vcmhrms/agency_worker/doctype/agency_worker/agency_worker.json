@@ -1,5 +1,6 @@
 {
   "doctype": "DocType",
+  "allow_import": 1,
   "name": "Agency Worker",
   "module": "Agency Worker",
   "engine": "InnoDB",
@@ -49,16 +50,17 @@
     {
       "fieldname": "worker_role",
       "label": "Role",
-      "fieldtype": "Data",
-      "in_list_view": 1
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "options": "Security Supervisor\nSecurity Guard\nSenior Supervisor\nHouse Lady\nHouse Boy\nSupervisor\nTechnician\nElectrician\nAC Technician\nPlumber\nExecutive\nR.O. Operator\nChief Security Officer\nLady Guard\nOther"
     },
     {
       "fieldname": "department",
       "label": "Department",
-      "fieldtype": "Link",
-      "options": "Department",
+      "fieldtype": "Select",
       "in_list_view": 1,
-      "in_standard_filter": 1
+      "in_standard_filter": 1,
+      "options": "\nHKM- Operation Housekeeping\nTSF- Matchless Gift Shop\nHKMV- Operation Security\nTSF- Braj Nidhi Guest House\nHKMV- Borewell\nTSF- Annakoot\nPest Control\nMaintenance\nMK Maintenance\nRO Maintenance\nMK Security"
     },
     {
       "fieldname": "budget_location",
@@ -155,9 +157,14 @@
     {
       "role": "ERP Manager",
       "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
       "report": 1,
       "export": 1,
-      "print": 1
+      "print": 1,
+      "email": 1,
+      "share": 1
     },
     {
       "role": "Agency Roster Manager",
@@ -175,4 +182,3 @@
   "links": [],
   "states": []
 }
-

@@ -1,5 +1,6 @@
 {
   "doctype": "DocType",
+  "allow_import": 1,
   "name": "Agency Roster",
   "module": "Agency Worker",
   "engine": "InnoDB",

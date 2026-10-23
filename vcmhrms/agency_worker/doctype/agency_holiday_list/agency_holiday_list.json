@@ -1,5 +1,6 @@
 {
   "doctype": "DocType",
+  "allow_import": 1,
   "name": "Agency Holiday List",
   "module": "Agency Worker",
   "engine": "InnoDB",
