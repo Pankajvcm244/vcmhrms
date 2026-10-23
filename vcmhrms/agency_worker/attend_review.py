@@ -14,8 +14,8 @@ def _check_worker_manager(worker):
 
 
 def _check_role():
-    if frappe.session.user=='Guest' or not ({'System Manager','Agency Worker Supervisor'} & set(frappe.get_roles())):
-        frappe.throw('Agency Worker Supervisor or System Manager role required.',frappe.PermissionError)
+    if frappe.session.user=='Guest' or not frappe.has_permission('Agency Attendance',ptype='read'):
+        frappe.throw('Read permission for Agency Attendance is required.',frappe.PermissionError)
 
 
 @frappe.whitelist()

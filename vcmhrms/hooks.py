@@ -135,10 +135,6 @@ permission_query_conditions = {
     "Employee Tax Exemption Proof Submission": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Application": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
     "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.payroll_permissions_query_conditions",
-    "Agency Worker": "vcmhrms.agency_worker.permissions.worker_query",
-    "Agency Roster": "vcmhrms.agency_worker.permissions.roster_query",
-    "Agency Attendance": "vcmhrms.agency_worker.permissions.attendance_query",
-    "Agency Punch": "vcmhrms.agency_worker.permissions.punch_query",
     # "Employee": "vcmhrms.vcm_hrms.utilities.access_guard.employee_permission_query",
 }
 
@@ -159,8 +155,6 @@ has_permission = {
     "Employee Benefit Claim": "vcmhrms.vcm_hrms.utilities.access_guard.has_confidential_payroll_permission",
 }
 
-has_permission.update({name: "vcmhrms.agency_worker.permissions.has_permission" for name in (
-    "Agency Worker", "Agency Roster", "Agency Attendance", "Agency Punch")})
 
 after_migrate = ["vcmhrms.agency_worker.setup.after_migrate"]
 

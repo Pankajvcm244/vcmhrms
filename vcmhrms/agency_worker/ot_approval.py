@@ -16,8 +16,8 @@ def _check_manager(worker):
 
 @frappe.whitelist()
 def get_pending_ot(from_date,to_date,budget_location=None,status='Pending'):
-    if frappe.session.user=='Guest' or not ({'System Manager','Agency Worker Supervisor'} & set(frappe.get_roles())):
-        frappe.throw('Agency Worker Supervisor or System Manager role required.',frappe.PermissionError)
+    if frappe.session.user=='Guest' or not frappe.has_permission('Agency Attendance',ptype='read'):
+        frappe.throw('Read permission for Agency Attendance is required.',frappe.PermissionError)
     start,end=getdate(from_date),getdate(to_date)
     if end<start or (end-start).days>92:
         frappe.throw('Choose a date range of at most 93 days.')
@@ -66,8 +66,8 @@ def get_pending_ot(from_date,to_date,budget_location=None,status='Pending'):
 
 @frappe.whitelist(methods=['POST'])
 def approve_ot(rows,remarks,decision='Custom'):
-    if frappe.session.user=='Guest' or not ({'System Manager','Agency Worker Supervisor'} & set(frappe.get_roles())):
-        frappe.throw('Agency Worker Supervisor or System Manager role required.',frappe.PermissionError)
+    if frappe.session.user=='Guest' or not frappe.has_permission('Agency Attendance',ptype='read'):
+        frappe.throw('Read permission for Agency Attendance is required.',frappe.PermissionError)
     if isinstance(rows,str): rows=json.loads(rows)
     if not isinstance(rows,list) or not 1<=len(rows)<=500: frappe.throw('Select between 1 and 500 OT rows.')
     remarks=(remarks or '').strip()

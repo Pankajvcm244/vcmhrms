@@ -10,11 +10,6 @@ from vcmhrms.agency_worker.permissions import is_supervisor
 from vcmhrms.agency_worker.service import check_budget_location
 
 
-def _can_view_all_workers():
-    roles=set(frappe.get_roles())
-    return frappe.session.user=='Administrator' or bool(
-        {'System Manager','Agency Worker Manager'} & roles
-    )
 
 
 def _day_status(items):
@@ -61,7 +56,6 @@ def execute(filters=None):
     if filters.agency: conditions.append('w.agency=%(agency)s'); values['agency']=filters.agency
     if filters.department: conditions.append('w.department=%(department)s'); values['department']=filters.department
     supervisor=filters.supervisor
-    if not _can_view_all_workers() and not supervisor: supervisor=frappe.session.user
     if supervisor:
         conditions.append("""exists(select 1 from `tabAgency Worker Supervisor` s
             where s.parent=w.name and s.parenttype='Agency Worker' and s.user=%(supervisor)s)""")
@@ -74,7 +68,7 @@ def execute(filters=None):
         dict(fieldname='worker_name',label='Agency Staff Name',fieldtype='Data',width=180),
         dict(fieldname='staff_id',label='Agency Staff ID',fieldtype='Data',width=110),
         dict(fieldname='agency',label='Agency',fieldtype='Link',options='Agency',width=130),
-        dict(fieldname='department',label='Department',fieldtype='Link',options='Department',width=130),
+        dict(fieldname='department',label='Department',fieldtype='Data',width=130),
         dict(fieldname='budget_location',label='Budget Location',fieldtype='Link',options='Budget Location',width=110)]
     columns += [dict(fieldname=f'day_{i}',label=date.strftime('%d %a'),fieldtype='Data',width=92) for i,date in enumerate(dates,1)]
     columns += [dict(fieldname='present_days',label='Present',fieldtype='Int',width=75),

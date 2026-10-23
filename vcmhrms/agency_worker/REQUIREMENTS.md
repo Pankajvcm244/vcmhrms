@@ -19,10 +19,10 @@ Attendance, Shift Type, or Holiday List records.
   from the biometric code.
 - **Biometric Code**: the identifier used by the biometric provider.
 - **Agency**: the external organization supplying agency staff.
-- **Roster Manager**: a user mapped to an individual Agency Worker who may create or
-  update that worker's roster.
-- **Supervisor**: a user mapped to an individual Agency Worker who may review that
-  worker's punch exceptions and approve or reject overtime.
+- **Roster Manager**: a user with Agency Roster permissions who may create or
+  update rosters according to Role Permissions Manager.
+- **Supervisor**: a user with Agency Attendance permissions who may review punch
+  exceptions and approve or reject overtime.
 - **Payroll month**: the attendance period from the 26th of the previous calendar
   month through the 25th of the selected month, inclusive.
 
@@ -61,21 +61,16 @@ Attendance, Shift Type, or Holiday List records.
 
 ### 4.3 Agency Roster Manager
 
-- May read only Agency Workers to whom the user is mapped.
-- May create, replace, or update rosters only for Agency Workers to whom the user is
-  mapped in `Agency Worker Roster Manager`.
+- May view, create, replace, or update rosters when granted those permissions in
+  Role Permissions Manager.
 - May use single-worker allocation, bulk simple-shift allocation, weekly-off
-  allocation, and detailed daily roster editing for mapped workers.
+  allocation, and detailed daily roster editing as permitted by the role.
 - Must not approve OT or punch exceptions solely because of this role.
 
 ### 4.4 Agency Worker Supervisor
 
-- May read only Agency Workers to whom the user is mapped.
-- May view and act on punch exceptions and OT only for Agency Workers to whom the
-  user is mapped in `Agency Worker Supervisor`.
-- Multiple supervisors may be mapped to the same Agency Worker.
-- Must not approve or edit another supervisor's unmapped workers by changing a page
-  or report filter.
+- May view and act on punch exceptions and OT when granted those permissions in
+  Role Permissions Manager.
 - Must not edit shift definitions or rosters solely because of this role.
 
 ### 4.5 Agency Worker Integration
@@ -246,8 +241,8 @@ Attendance, Shift Type, or Holiday List records.
 ## 11. Punch review and exceptions
 
 - Late Entry, Early Exit, Half Day, Absent, and Needs Review require punch review.
-- A mapped supervisor may acknowledge the calculated result with mandatory remarks.
-- A mapped supervisor may enter a corrected first/last pair or a justified status
+- A supervisor with the required role may acknowledge the calculated result with mandatory remarks.
+- A supervisor with the required role may enter a corrected first/last pair or a justified status
   override with a mandatory reason.
 - Corrected punches are audit fields; original Agency Punch records are unchanged.
 - Approval records who acted, when, and the remarks.
@@ -272,9 +267,8 @@ Attendance, Shift Type, or Holiday List records.
 - The month filter uses `MM-YYYY` and covers the 26th through the 25th.
 - Filters include Budget Location, Agency, Department, and Supervisor.
 - Agency Worker Manager and System Manager may select All or a specific Supervisor.
-- If Agency Worker Supervisor is granted report access in the future, that role may
-  view only workers mapped to the logged-in supervisor; request parameters must not
-  expand its access.
+- Monthly report access follows Role Permissions Manager. The Supervisor filter is
+  a reporting filter and does not grant or remove document permissions.
 - The grid shows Agency Staff Name, Agency Staff ID, Agency, Department, Budget
   Location, every period date with weekday, Present/Half Day/Absent totals, and
   approved OT.
@@ -347,8 +341,7 @@ Every change to `vcmhrms/agency_worker` should verify at least:
 16. Offset-free India time and offset-bearing ISO time normalize correctly.
 17. Bulk roster assignment handles multiple workers, weekly offs, Skip Existing, and
     Replace Existing and reports failures.
-18. Roster Manager and Supervisor cannot act on unmapped workers, including by
-    changing request parameters or report filters.
+18. Roster Manager and Supervisor access follows Role Permissions Manager.
 19. Agency Worker access does not depend on Budget Location User Permission.
 20. Agency holidays do not query regular HRMS Holiday List records.
 21. A holiday date retains its real attendance/OT/pending state, receives the configured
