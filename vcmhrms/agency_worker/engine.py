@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Pankaj Sharma and contributors
+# For license information, please see license.txt
+
 """Pure attendance calculation; original directionless punches are never modified."""
 from datetime import timedelta
 

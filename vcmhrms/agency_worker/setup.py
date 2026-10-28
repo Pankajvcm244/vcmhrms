@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Pankaj Sharma and contributors
+# For license information, please see license.txt
+
 import frappe
 
 
@@ -19,6 +22,7 @@ AGENCY_PAGES = (
 AGENCY_REPORTS = (
     "Agency Monthly Attendance",
     "Agency Roster vs Attendance",
+    "Agency Shift Roster Summary",
 )
 
 AGENCY_WORKSPACE = "Agency HR Worker"
@@ -43,6 +47,7 @@ def after_migrate():
         constraint_name="unique_agency_worker_date",
     )
     _sync_agency_page_and_report_roles()
+    _backfill_roster_worker_names()
     _sync_agency_workspace()
     _fix_invalid_desk_home_page()
 
@@ -74,6 +79,20 @@ def _sync_agency_page_and_report_roles():
 
     frappe.clear_cache()
 
+
+
+def _backfill_roster_worker_names():
+    """Populate the export-friendly staff name for rosters created before this field."""
+    if not frappe.db.has_column("Agency Roster", "worker_name"):
+        return
+    frappe.db.sql(
+        """
+        update `tabAgency Roster` roster
+        inner join `tabAgency Worker` worker on worker.name = roster.worker
+        set roster.worker_name = worker.worker_name
+        where coalesce(roster.worker_name, '') != coalesce(worker.worker_name, '')
+        """
+    )
 
 def _sync_agency_workspace():
     """Expose the shared VCM HRMS workspace through the Agency Worker module."""

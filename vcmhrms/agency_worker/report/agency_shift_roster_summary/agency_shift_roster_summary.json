@@ -1,0 +1,16 @@
+{
+  "doctype": "Report",
+  "name": "Agency Shift Roster Summary",
+  "report_name": "Agency Shift Roster Summary",
+  "ref_doctype": "Agency Roster",
+  "module": "Agency Worker",
+  "report_type": "Script Report",
+  "is_standard": "Yes",
+  "roles": [
+    {"role": "System Manager"},
+    {"role": "Agency Worker Manager"},
+    {"role": "Agency Roster Manager"},
+    {"role": "Agency Worker Supervisor"},
+    {"role": "ERP Manager"}
+  ]
+}

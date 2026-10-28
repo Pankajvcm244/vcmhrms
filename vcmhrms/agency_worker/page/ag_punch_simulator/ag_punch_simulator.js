@@ -1,3 +1,6 @@
+// Copyright (c) 2026, Pankaj Sharma and contributors
+// For license information, please see license.txt
+
 frappe.pages['ag-punch-simulator'].on_page_load = function(wrapper) {
     const page = frappe.ui.make_app_page({parent:wrapper, title:__('Agency Punch Simulator'), single_column:true});
     const esc = value => frappe.utils.escape_html(String(value ?? ''));

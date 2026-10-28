@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Pankaj Sharma and contributors
+# For license information, please see license.txt
+
 from calendar import monthrange
 from datetime import date, timedelta
 from datetime import datetime

@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Pankaj Sharma and contributors
+# For license information, please see license.txt
+
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, now_datetime
 from vcmhrms.agency_worker.service import check_budget_location, recalculate

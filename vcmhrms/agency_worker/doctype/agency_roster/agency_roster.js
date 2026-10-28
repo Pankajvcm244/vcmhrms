@@ -1,3 +1,6 @@
+// Copyright (c) 2026, Pankaj Sharma and contributors
+// For license information, please see license.txt
+
 frappe.ui.form.on('Agency Roster', {
     refresh(frm) {
         if (frappe.user_roles.includes('System Manager') || frappe.user_roles.includes('ERP Manager')) {

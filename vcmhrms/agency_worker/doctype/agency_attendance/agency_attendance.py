@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Pankaj Sharma and contributors
+# For license information, please see license.txt
+
 from frappe.model.document import Document
 import frappe
 from frappe.model.naming import make_autoname

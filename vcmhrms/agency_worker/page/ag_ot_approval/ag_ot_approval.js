@@ -1,3 +1,6 @@
+// Copyright (c) 2026, Pankaj Sharma and contributors
+// For license information, please see license.txt
+
 frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
     const page=frappe.ui.make_app_page({parent:wrapper,title:__('Agency OT Approval'),single_column:true});
     const from=page.add_field({fieldname:'from_date',label:'From Date',fieldtype:'Date',default:frappe.datetime.month_start(),reqd:1});

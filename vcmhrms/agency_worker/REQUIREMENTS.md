@@ -145,8 +145,15 @@ Attendance, Shift Type, or Holiday List records.
 
 ## 7. Roster rules
 
-- Monthly Roster filters include Agency Staff Name, Agency, Budget Location, and month.
-  Staff and Agency filtering is applied by the server before roster rows are returned.
+- Monthly Roster uses a month dropdown. From the 1st through the 25th it defaults to
+  the current payroll month; from the 26th onward it defaults to the next month.
+- Monthly Roster loads automatically and supports instant in-grid search by Agency
+  Staff Name or Agency Staff ID without reloading the roster.
+- Worker selections persist while the manager changes the search text or Agency
+  filter. **Select all** applies only to currently visible rows, and the page displays
+  the total number of selected staff before bulk assignment.
+- Budget Location and Agency remain roster filters. Changing the payroll month or
+  Budget Location clears the selection to prevent assigning the wrong period or site.
 
 1. Only one Agency Roster may exist for a worker and roster date.
 2. A Duty roster must have at least one duty. A Weekly Off roster must have no duty.
@@ -165,6 +172,10 @@ Attendance, Shift Type, or Holiday List records.
 10. Bulk completion must report created, replaced, skipped, and failed worker counts.
 11. Roster changes must recalculate the affected roster and neighboring dates needed
     for overnight punch matching.
+12. Agency roster exports must include the readable Agency Staff Name. The internal
+    Agency Worker document ID may remain available as a separate technical field.
+13. Agency Shift Roster Summary reports distinct assigned staff and assigned duty
+    days by shift, with date range, Budget Location, Agency, Department, and Shift filters.
 
 ## 8. Biometric punch API
 
@@ -406,3 +417,4 @@ regression cases and must not be reintroduced:
 
 
 - Roster vs Attendance filters include date range, Budget Location, Agency, Department, Agency Staff Name, Shift, Duty / Off, and Attendance Status.
+

@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Pankaj Sharma and contributors
+# For license information, please see license.txt
+
 """Biometric adapter for directionless punch times from the attendance provider."""
 from datetime import datetime
 from hashlib import sha256
