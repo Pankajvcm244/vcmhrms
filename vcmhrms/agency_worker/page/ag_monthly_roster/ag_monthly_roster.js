@@ -114,8 +114,8 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
         if (!workers.length) {
             return frappe.msgprint(__('Search staff and select at least one worker from the first column.'));
         }
-        const [monthNumber, year] = loadedMonth.split('-');
-        const lastDay = new Date(Number(year), Number(monthNumber), 0).getDate();
+        const periodStart = String(loadedData.period_start).slice(0, 10);
+        const periodEnd = String(loadedData.period_end).slice(0, 10);
         const dialog = new frappe.ui.Dialog({
             title: __('Bulk Assign Simple Shift'),
             fields: [
@@ -124,8 +124,8 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
                     fieldtype: 'HTML',
                     options: `<p><b>${workers.length}</b> staff selected. Existing dates are skipped by default so OT and multiple-shift exceptions remain unchanged.</p>`
                 },
-                {fieldname: 'from_date', label: 'From Date', fieldtype: 'Date', reqd: 1, default: `${year}-${monthNumber}-01`},
-                {fieldname: 'to_date', label: 'To Date', fieldtype: 'Date', reqd: 1, default: `${year}-${monthNumber}-${String(lastDay).padStart(2, '0')}`},
+                {fieldname: 'from_date', label: 'From Date', fieldtype: 'Date', reqd: 1, default: periodStart},
+                {fieldname: 'to_date', label: 'To Date', fieldtype: 'Date', reqd: 1, default: periodEnd},
                 {fieldname: 'shift', label: 'Simple Shift', fieldtype: 'Link', options: 'Agency Shift', reqd: 1},
                 {
                     fieldname: 'weekly_off',
@@ -202,19 +202,19 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
     }
 
     function renderRoster(data, selectedLocation, selectedMonth) {
-        const [selectedMonthNumber, selectedYear] = selectedMonth.split('-');
+        const dates = (data.dates || []).map(value => String(value).slice(0, 10));
         const lookup = new Map(data.rosters.map(row => [
             `${row.worker}|${String(row.roster_date).slice(0, 10)}`,
             row
         ]));
-        let html = '<p>Select staff across searches, then click <b>Bulk Assign Simple Shift</b>. The selection remains while you search. Click a day to edit OT, multiple shifts or other exceptions. OFF = weekly off.</p>';
+        let html = `<p><b>${esc(String(data.period_start).slice(0, 10))}</b> to <b>${esc(String(data.period_end).slice(0, 10))}</b>. Select staff across searches, then click <b>Bulk Assign Simple Shift</b>. The selection remains while you search. Click a day to edit OT, multiple shifts or other exceptions. OFF = weekly off.</p>`;
         html += '<table class="table table-bordered"><thead><tr>';
         html += '<th><input type="checkbox" class="select-all-workers" title="Select all visible staff"></th>';
         html += '<th>Agency Staff Name</th><th>Agency Staff ID</th><th>Agency</th>';
-        for (let day = 1; day <= data.days; day++) {
-            const date = new Date(Number(selectedYear), Number(selectedMonthNumber) - 1, day);
-            html += `<th>${String(day).padStart(2, '0')} ${date.toLocaleDateString('en-US', {weekday: 'short'})}</th>`;
-        }
+        dates.forEach(dateText => {
+            const date = new Date(`${dateText}T00:00:00`);
+            html += `<th>${dateText.slice(8, 10)} ${date.toLocaleDateString('en-US', {weekday: 'short'})}</th>`;
+        });
         html += '</tr></thead><tbody>';
         data.workers.forEach((staff, index) => {
             const checked = selectedWorkerNames.has(staff.name) ? ' checked' : '';
@@ -223,12 +223,11 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
             html += `<td><input type="checkbox" class="worker-select" data-worker="${esc(staff.name)}"${checked}></td>`;
             html += `<th style="white-space:nowrap">${esc(staff.worker_name)}</th>`;
             html += `<td>${esc(staff.staff_id)}</td><td>${esc(staff.agency)}</td>`;
-            for (let day = 1; day <= data.days; day++) {
-                const date = `${selectedYear}-${selectedMonthNumber}-${String(day).padStart(2, '0')}`;
+            dates.forEach(date => {
                 const row = lookup.get(`${staff.name}|${date}`);
                 const label = row ? (row.day_type === 'Weekly Off' ? 'OFF' : row.shifts.join(' + ')) : '+';
                 html += `<td><button class="btn btn-xs ${label === 'OFF' ? 'btn-success' : 'btn-default'}" data-worker="${index}" data-date="${date}">${esc(label)}</button></td>`;
-            }
+            });
             html += '</tr>';
         });
         html += '</tbody></table>';
@@ -270,3 +269,5 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
     });
     setTimeout(loadRoster, 0);
 };
+
+
