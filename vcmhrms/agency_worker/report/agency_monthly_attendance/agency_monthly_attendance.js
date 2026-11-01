@@ -24,11 +24,11 @@ frappe.query_reports['Agency Monthly Attendance'] = {
     },
     filters: [
         {fieldname:'year',label:'Year',fieldtype:'Select',reqd:1,
-            options:(()=>{const value=frappe.datetime.get_today(); return value.slice(0,4);})(),
-            default:(()=>{const value=frappe.datetime.get_today(); return value.slice(0,4);})()},
+            options:(()=>{const today=new Date(`${frappe.datetime.get_today()}T00:00:00`); if(today.getDate()>=26)today.setMonth(today.getMonth()+1); return String(today.getFullYear());})(),
+            default:(()=>{const today=new Date(`${frappe.datetime.get_today()}T00:00:00`); if(today.getDate()>=26)today.setMonth(today.getMonth()+1); return String(today.getFullYear());})()},
         {fieldname:'month',label:'Month',fieldtype:'Select',reqd:1,
             options:'01 - January\n02 - February\n03 - March\n04 - April\n05 - May\n06 - June\n07 - July\n08 - August\n09 - September\n10 - October\n11 - November\n12 - December',
-            default:(()=>{const value=frappe.datetime.get_today(); const names=['January','February','March','April','May','June','July','August','September','October','November','December']; const number=value.slice(5,7); return `${number} - ${names[Number(number)-1]}`;})()},
+            default:(()=>{const today=new Date(`${frappe.datetime.get_today()}T00:00:00`); if(today.getDate()>=26)today.setMonth(today.getMonth()+1); const names=['January','February','March','April','May','June','July','August','September','October','November','December']; const number=String(today.getMonth()+1).padStart(2,'0'); return `${number} - ${names[today.getMonth()]}`;})()},
         {fieldname:'budget_location',label:'Budget Location',fieldtype:'Link',options:'Budget Location',default:'VRN',reqd:1},
         {fieldname:'agency',label:'Agency',fieldtype:'Link',options:'Agency'},
         {fieldname:'department',label:'Department',fieldtype:'Select',options:`
@@ -61,3 +61,5 @@ MK Security`},
         return value;
     }
 };
+
+

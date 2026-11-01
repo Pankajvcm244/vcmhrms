@@ -3,11 +3,25 @@
 
 frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
     const page=frappe.ui.make_app_page({parent:wrapper,title:__('Agency Attendance Review'),single_column:true});
-    const from=page.add_field({fieldname:'from_date',label:'From Date',fieldtype:'Date',default:frappe.datetime.month_start(),reqd:1});
-    const to=page.add_field({fieldname:'to_date',label:'To Date',fieldtype:'Date',default:frappe.datetime.get_today(),reqd:1});
-    const budget_location=page.add_field({fieldname:'budget_location',label:'Budget Location',fieldtype:'Link',options:'Budget Location',default:'VRN'});
-    const issue=page.add_field({fieldname:'issue',label:'Issue',fieldtype:'Select',options:'All\nMissing Punch\nHalf Day\nAbsent\nLate Entry\nEarly Exit',default:'All'});
-    const reviewStatus=page.add_field({fieldname:'review_status',label:'Punch Approval',fieldtype:'Select',options:'Pending\nApproved\nAll',default:'Pending'});
+    let filtersReady=false;
+    let reloadTimer=null;
+    const applyFilters=()=>{
+        if(!filtersReady)return;
+        clearTimeout(reloadTimer);
+        reloadTimer=setTimeout(()=>load(),250);
+    };
+    const today=new Date(`${frappe.datetime.get_today()}T00:00:00`);
+    const payrollEnd=new Date(today.getFullYear(),today.getMonth()+(today.getDate()>=26?1:0),25);
+    const payrollStart=new Date(payrollEnd.getFullYear(),payrollEnd.getMonth()-1,26);
+    const dateValue=value=>frappe.datetime.obj_to_str(value);
+    const from=page.add_field({fieldname:'from_date',label:'From Date',fieldtype:'Date',default:dateValue(payrollStart),reqd:1,change:applyFilters});
+    const to=page.add_field({fieldname:'to_date',label:'To Date',fieldtype:'Date',default:dateValue(payrollEnd),reqd:1,change:applyFilters});
+    const budget_location=page.add_field({fieldname:'budget_location',label:'Budget Location',fieldtype:'Link',options:'Budget Location',default:'VRN',change:applyFilters});
+    const worker=page.add_field({fieldname:'worker',label:'Agency Staff',fieldtype:'Link',options:'Agency Worker',change:applyFilters});
+    const agency=page.add_field({fieldname:'agency',label:'Agency',fieldtype:'Link',options:'Agency',change:applyFilters});
+    const shift=page.add_field({fieldname:'shift',label:'Shift',fieldtype:'Link',options:'Agency Shift',change:applyFilters});
+    const issue=page.add_field({fieldname:'issue',label:'Issue',fieldtype:'Select',options:'All\nMissing Punch\nHalf Day\nAbsent\nLate Entry\nEarly Exit',default:'All',change:applyFilters});
+    const reviewStatus=page.add_field({fieldname:'review_status',label:'Punch Approval',fieldtype:'Select',options:'Pending\nApproved\nAll',default:'Pending',change:applyFilters});
     const body=$('<div class="mt-3" style="overflow:auto"></div>').appendTo(page.main);
     const esc=value=>frappe.utils.escape_html(String(value??''));
     const displayDate=value=>{
@@ -21,10 +35,30 @@ frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
         return `${displayDate(text.slice(0,10))} ${text.slice(11,19)}`.trim();
     };
     let rows=[];
+    let loadRequest=0;
+    function exportCsv(){
+        if(!rows.length)return frappe.msgprint(__('There are no loaded attendance rows to export.'));
+        const columns=[['Agency Staff Name','worker_name'],['Agency Staff ID','staff_id'],['Agency','agency'],
+            ['Date','date'],['Shift','shift'],['First In','first_in'],['Last Out','last_out'],
+            ['Worked Hours','worked_hours'],['Required Hours','required_hours'],['Status','status'],
+            ['Flags','issues'],['Punch Approval','punch_approval_status'],['Approved By','punch_approved_by'],
+            ['Approval Remarks','punch_approval_remarks']];
+        const quote=value=>`"${String(value??'').replaceAll('"','""')}"`;
+        const csv=[columns.map(column=>quote(column[0])).join(','),...rows.map(row=>
+            columns.map(column=>quote(row[column[1]])).join(','))].join('\r\n');
+        const link=document.createElement('a');
+        link.href=URL.createObjectURL(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}));
+        link.download=`Agency Attendance Review ${from.get_value()} to ${to.get_value()}.csv`;
+        link.click(); URL.revokeObjectURL(link.href);
+    }
     async function load(){
+        const request=++loadRequest;
+        body.html('<p class="text-muted">Applying attendance filters…</p>');
         const {message}=await frappe.call({method:'vcmhrms.agency_worker.attend_review.get_exceptions',args:{
-            from_date:from.get_value(),to_date:to.get_value(),budget_location:budget_location.get_value(),issue:issue.get_value(),
-            review_status:reviewStatus.get_value()},freeze:true});
+            from_date:from.get_value(),to_date:to.get_value(),budget_location:budget_location.get_value(),worker:worker.get_value(),
+            agency:agency.get_value(),shift:shift.get_value(),issue:issue.get_value(),
+            review_status:reviewStatus.get_value()}});
+        if(request!==loadRequest)return;
         rows=message||[];
         body.html(`<p>${rows.length} attendance exceptions. Managers see only workers assigned to them; System Manager is backup.</p>
         <table class="table table-bordered"><thead><tr><th>Worker</th><th>Date</th><th>Shift</th><th>First In</th><th>Last Out</th>
@@ -66,6 +100,10 @@ frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
         frappe.msgprint(__(`Found ${message.found}; recalculated ${message.recalculated}; failed ${message.failed}.`));
         await load();
     });
+    page.add_inner_button(__('Export CSV'),exportCsv);
     page.set_primary_action(__('Load Exceptions'),load);
+    filtersReady=true;
     load();
 };
+
+

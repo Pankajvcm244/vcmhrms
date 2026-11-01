@@ -18,7 +18,7 @@ def _check_manager(worker):
 
 
 @frappe.whitelist()
-def get_pending_ot(from_date,to_date,budget_location=None,status='Pending'):
+def get_pending_ot(from_date,to_date,budget_location=None,worker=None,agency=None,status='Pending'):
     if frappe.session.user=='Guest' or not frappe.has_permission('Agency Attendance',ptype='read'):
         frappe.throw('Read permission for Agency Attendance is required.',frappe.PermissionError)
     start,end=getdate(from_date),getdate(to_date)
@@ -27,13 +27,21 @@ def get_pending_ot(from_date,to_date,budget_location=None,status='Pending'):
     if budget_location: check_budget_location(budget_location)
     filters={'roster_date':['between',[start,end]]}
     if budget_location: filters['budget_location']=budget_location
+    if worker:
+        if agency and frappe.db.get_value('Agency Worker',worker,'agency')!=agency:
+            return []
+        filters['worker']=worker
+    elif agency:
+        agency_workers=frappe.get_all('Agency Worker',filters={'agency':agency},pluck='name')
+        if not agency_workers: return []
+        filters['worker']=['in',agency_workers]
     rosters=frappe.get_list('Agency Roster',filters=filters,fields=['name','worker','roster_date','budget_location'],limit_page_length=0)
     rows=[]
     worker_cache={}
     for roster in rosters:
         if roster.worker not in worker_cache:
             worker=frappe.db.get_value('Agency Worker',roster.worker,
-                ['worker_name','staff_id'],as_dict=True) or frappe._dict()
+                ['worker_name','staff_id','agency'],as_dict=True) or frappe._dict()
             supervisors=frappe.get_all('Agency Worker Supervisor',filters={'parent':roster.worker},pluck='user')
             worker['supervisor']=frappe.session.user if frappe.session.user in supervisors else (supervisors[0] if supervisors else None)
             worker['supervisor_name']=', '.join(supervisors)
@@ -57,7 +65,7 @@ def get_pending_ot(from_date,to_date,budget_location=None,status='Pending'):
             if status and status!='All' and approval_status!=status: continue
             rows.append(dict(attendance=attendance.name,roster_duty=result.roster_duty,worker=roster.worker,
                 worker_name=worker_name,date=roster.roster_date,budget_location=roster.budget_location,shift=result.shift,
-                staff_id=worker.staff_id,supervisor=worker.supervisor,
+                staff_id=worker.staff_id,agency=worker.agency,supervisor=worker.supervisor,
                 supervisor_name=worker.supervisor_name,
                 planned_before=roster_duty.planned_before_ot_hours or 0,actual_before=result.actual_before_ot_hours or 0,
                 approved_before=result.approved_before_ot_hours or 0,planned_after=roster_duty.planned_after_ot_hours or 0,
@@ -125,4 +133,6 @@ def approve_ot(rows,remarks,decision='Custom'):
         attendance.flags.bulk_ot_approval=True
         attendance.save()
     return dict(updated=updated)
+
+
 

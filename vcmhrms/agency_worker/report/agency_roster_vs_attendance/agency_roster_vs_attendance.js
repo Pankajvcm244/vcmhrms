@@ -3,8 +3,13 @@
 
 frappe.query_reports['Agency Roster vs Attendance'] = {
     filters: [
-        {fieldname:'from_date',label:'From Date',fieldtype:'Date',reqd:1,default:frappe.datetime.month_start()},
-        {fieldname:'to_date',label:'To Date',fieldtype:'Date',reqd:1,default:frappe.datetime.get_today()},
+        {fieldname:'from_date',label:'From Date',fieldtype:'Date',reqd:1,default:(()=>{
+            const today=new Date(`${frappe.datetime.get_today()}T00:00:00`);
+            const end=new Date(today.getFullYear(),today.getMonth()+(today.getDate()>=26?1:0),25);
+            return frappe.datetime.obj_to_str(new Date(end.getFullYear(),end.getMonth()-1,26));})()},
+        {fieldname:'to_date',label:'To Date',fieldtype:'Date',reqd:1,default:(()=>{
+            const today=new Date(`${frappe.datetime.get_today()}T00:00:00`);
+            return frappe.datetime.obj_to_str(new Date(today.getFullYear(),today.getMonth()+(today.getDate()>=26?1:0),25));})()},
         {fieldname:'budget_location',label:'Budget Location',fieldtype:'Link',options:'Budget Location',reqd:1,default:'VRN'},
         {fieldname:'agency',label:'Agency',fieldtype:'Link',options:'Agency'},
         {fieldname:'department',label:'Department',fieldtype:'Select',options:`
@@ -28,3 +33,5 @@ MK Security`},
         {fieldname:'status',label:'Attendance Status',fieldtype:'Select',options:`\nPending\nNeeds Review\nPresent\nHalf Day\nAbsent\nWeekly Off`}
     ]
 };
+
+

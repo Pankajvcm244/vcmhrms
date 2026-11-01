@@ -36,8 +36,10 @@ def get_supervisors(doctype,txt,searchfield,start,page_len,filters):
 
 @frappe.whitelist()
 def get_payroll_years():
-    current_year=getdate(today()).year
-    years={current_year}
+    current=getdate(today())
+    current_year=current.year
+    payroll_year=current_year+1 if current.month==12 and current.day>=26 else current_year
+    years={current_year,payroll_year}
     years.update(int(row.year) for row in frappe.db.sql(
         """select distinct year(roster_date) year from `tabAgency Roster`
         where roster_date is not null order by year desc""",as_dict=True) if row.year)
@@ -134,5 +136,7 @@ def execute(filters=None):
         'L = Late Entry; E = Early Exit; — = No roster. '
         '✓ = no pending punch or OT action. Agency holidays use the agency holiday colour.')
     return columns,data,message
+
+
 
 

@@ -258,6 +258,11 @@ Attendance, Shift Type, or Holiday List records.
 
 ## 11. Punch review and exceptions
 
+- Attendance Review defaults to the active 26th-to-25th payroll period.
+- Filters include Budget Location, Agency, Agency Staff, Shift, issue type, and punch
+  approval status. Changing a filter automatically refreshes the displayed results;
+  the manual Load Exceptions action remains available.
+- Export CSV exports the currently loaded, filtered review rows.
 - Late Entry, Early Exit, Half Day, Absent, and Needs Review require punch review.
 - A supervisor with the required role may acknowledge the calculated result with mandatory remarks.
 - A supervisor with the required role may enter a corrected first/last pair or a justified status
@@ -268,6 +273,10 @@ Attendance, Shift Type, or Holiday List records.
 
 ## 12. Overtime approval
 
+- OT Approval defaults to the active 26th-to-25th payroll period.
+- Filters include Budget Location, Agency, Agency Staff, and approval status. Changing
+  a filter automatically refreshes the displayed results.
+- Export CSV exports the currently loaded, filtered OT rows.
 - OT approval is required only if planned or actual before/after OT is greater than
   zero. No-OT duties use `Not Required`, never `Pending`.
 - The approval page shows Agency Staff Name, Agency Staff ID, supervisor name, date,
@@ -282,7 +291,9 @@ Attendance, Shift Type, or Holiday List records.
 
 ## 13. Monthly attendance report
 
-- The month filter uses `MM-YYYY` and covers the 26th through the 25th.
+- The Year and Month selectors identify a payroll month and cover the 26th of the
+  previous calendar month through the 25th of the selected month. From the 26th
+  onward, the default payroll month is the following calendar month.
 - Filters include Budget Location, Agency, Department, Agency Staff Name, and Supervisor.
 - The report note explains every displayed abbreviation: P, HD, A, OFF, PD, NR, L,
   E, the no-roster dash, the completion tick, and agency-holiday colour.
@@ -306,6 +317,7 @@ Attendance, Shift Type, or Holiday List records.
 
 ## 14. Roster-versus-attendance report
 
+- The default date range is the active 26th-to-25th payroll period.
 - Shows the roster allocation and calculated attendance for operational review.
 - Time values use `HH:MM` format.
 - OT columns are named `OT Before Shift` and `OT After Shift`.
@@ -375,6 +387,10 @@ Every change to `vcmhrms/agency_worker` should verify at least:
 26. After locking, UI actions, direct RPC calls, bulk jobs, recalculation, and biometric
     ingestion cannot change the period.
 27. Scheduled and manual finalization produce the same idempotent result.
+28. Attendance Review and OT Approval default to the active payroll period, apply
+    Agency/Agency Staff filters correctly, and export only the currently filtered rows.
+29. Roster vs Attendance defaults to the active payroll period, and Monthly Attendance
+    advances its default payroll month after the 25th, including December-to-January rollover.
 
 ## 18. Initial agency-data import rules
 

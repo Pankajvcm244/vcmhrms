@@ -3,24 +3,56 @@
 
 frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
     const page=frappe.ui.make_app_page({parent:wrapper,title:__('Agency OT Approval'),single_column:true});
-    const from=page.add_field({fieldname:'from_date',label:'From Date',fieldtype:'Date',default:frappe.datetime.month_start(),reqd:1});
-    const to=page.add_field({fieldname:'to_date',label:'To Date',fieldtype:'Date',default:frappe.datetime.get_today(),reqd:1});
-    const budget_location=page.add_field({fieldname:'budget_location',label:'Budget Location',fieldtype:'Link',options:'Budget Location',default:'VRN'});
-    const status=page.add_field({fieldname:'status',label:'Status',fieldtype:'Select',options:'Pending\nApproved\nRejected\nAll',default:'Pending'});
+    let filtersReady=false;
+    let reloadTimer=null;
+    const applyFilters=()=>{
+        if(!filtersReady)return;
+        clearTimeout(reloadTimer);
+        reloadTimer=setTimeout(()=>load(),250);
+    };
+    const today=new Date(`${frappe.datetime.get_today()}T00:00:00`);
+    const payrollEnd=new Date(today.getFullYear(),today.getMonth()+(today.getDate()>=26?1:0),25);
+    const payrollStart=new Date(payrollEnd.getFullYear(),payrollEnd.getMonth()-1,26);
+    const from=page.add_field({fieldname:'from_date',label:'From Date',fieldtype:'Date',default:frappe.datetime.obj_to_str(payrollStart),reqd:1,change:applyFilters});
+    const to=page.add_field({fieldname:'to_date',label:'To Date',fieldtype:'Date',default:frappe.datetime.obj_to_str(payrollEnd),reqd:1,change:applyFilters});
+    const budget_location=page.add_field({fieldname:'budget_location',label:'Budget Location',fieldtype:'Link',options:'Budget Location',default:'VRN',change:applyFilters});
+    const agency=page.add_field({fieldname:'agency',label:'Agency',fieldtype:'Link',options:'Agency',change:applyFilters});
+    const worker=page.add_field({fieldname:'worker',label:'Agency Staff',fieldtype:'Link',options:'Agency Worker',change:applyFilters});
+    const status=page.add_field({fieldname:'status',label:'Status',fieldtype:'Select',options:'Pending\nApproved\nRejected\nAll',default:'Pending',change:applyFilters});
     const body=$('<div class="mt-3" style="overflow:auto"></div>').appendTo(page.main);
     const esc=value=>frappe.utils.escape_html(String(value??''));
     let rows=[];
+    let loadRequest=0;
+    function exportCsv(){
+        if(!rows.length)return frappe.msgprint(__('There are no loaded OT rows to export.'));
+        const columns=[['Agency Staff Name','worker_name'],['Agency Staff ID','staff_id'],['Agency','agency'],['Supervisor','supervisor_name'],
+            ['Date','date'],['Shift','shift'],['Planned Before','planned_before'],['Actual Before','actual_before'],
+            ['Approved Before','approved_before'],['Planned After','planned_after'],['Actual After','actual_after'],
+            ['Approved After','approved_after'],['OT Reason','reason'],['Status','status'],['Approved By','approved_by'],
+            ['Approved At','approved_at'],['Approval Remarks','remarks']];
+        const quote=value=>`"${String(value??'').replaceAll('"','""')}"`;
+        const csv=[columns.map(column=>quote(column[0])).join(','),...rows.map(row=>
+            columns.map(column=>quote(row[column[1]])).join(','))].join('\r\n');
+        const link=document.createElement('a');
+        link.href=URL.createObjectURL(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}));
+        link.download=`Agency OT Approval ${from.get_value()} to ${to.get_value()}.csv`;
+        link.click(); URL.revokeObjectURL(link.href);
+    }
     async function load() {
+        const request=++loadRequest;
+        body.html('<p class="text-muted">Applying OT filters…</p>');
         const {message}=await frappe.call({method:'vcmhrms.agency_worker.ot_approval.get_pending_ot',args:{
-            from_date:from.get_value(),to_date:to.get_value(),budget_location:budget_location.get_value(),status:status.get_value()},freeze:true});
+            from_date:from.get_value(),to_date:to.get_value(),budget_location:budget_location.get_value(),
+            agency:agency.get_value(),worker:worker.get_value(),status:status.get_value()}});
+        if(request!==loadRequest)return;
         rows=message||[];
         body.html(`<p>${rows.length} OT duties. Managers see only workers assigned to them as Supervisor.</p><table class="table table-bordered"><thead><tr>
-            <th><input type="checkbox" class="select-all"></th><th>Worker</th><th>Staff ID</th><th>Supervisor</th><th>Date</th><th>Shift</th>
+            <th><input type="checkbox" class="select-all"></th><th>Worker</th><th>Staff ID</th><th>Agency</th><th>Supervisor</th><th>Date</th><th>Shift</th>
             <th>Planned Before</th><th>Actual Before</th><th>Approve Before</th>
             <th>Planned After</th><th>Actual After</th><th>Approve After</th><th>OT Reason</th><th>Status</th>
             <th>Approved By</th><th>Approved At</th><th>Approval Remarks</th></tr></thead><tbody>`+
             rows.map((row,index)=>{const locked=row.status!=='Pending';return `<tr><td><input type="checkbox" class="select-row" data-index="${index}" ${locked?'disabled':''}></td>
-            <td>${esc(row.worker_name)}</td><td>${esc(row.staff_id)}</td><td>${esc(row.supervisor_name)}</td><td>${esc(row.date)}</td><td>${esc(row.shift)}</td>
+            <td>${esc(row.worker_name)}</td><td>${esc(row.staff_id)}</td><td>${esc(row.agency)}</td><td>${esc(row.supervisor_name)}</td><td>${esc(row.date)}</td><td>${esc(row.shift)}</td>
             <td>${row.planned_before}</td><td>${row.actual_before}</td><td><input class="form-control before" data-index="${index}" type="number" min="0" max="${row.actual_before}" step="0.25" value="${row.approved_before}" ${locked?'disabled':''}></td>
             <td>${row.planned_after}</td><td>${row.actual_after}</td><td><input class="form-control after" data-index="${index}" type="number" min="0" max="${row.actual_after}" step="0.25" value="${row.approved_after}" ${locked?'disabled':''}></td>
             <td>${esc(row.reason)}</td><td>${esc(row.status)}</td><td>${esc(row.approved_by)}</td><td>${esc(row.approved_at)}</td><td>${esc(row.remarks)}</td></tr>`;}).join('')+'</tbody></table>');
@@ -48,5 +80,9 @@ frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
     page.add_inner_button(__('Approve Actual'),()=>approve('Actual'));
     page.add_inner_button(__('Save Custom'),()=>approve('Custom'));
     page.add_inner_button(__('Reject'),()=>approve('Reject'));
+    page.add_inner_button(__('Export CSV'),exportCsv);
+    filtersReady=true;
     load();
 };
+
+

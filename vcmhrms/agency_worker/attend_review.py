@@ -22,14 +22,24 @@ def _check_role():
 
 
 @frappe.whitelist()
-def get_exceptions(from_date,to_date,budget_location=None,issue='All',review_status='Pending'):
+def get_exceptions(from_date,to_date,budget_location=None,worker=None,agency=None,shift=None,
+                   issue='All',review_status='Pending'):
     _check_role()
     start,end=getdate(from_date),getdate(to_date)
     if end<start or (end-start).days>92: frappe.throw('Choose a date range of at most 93 days.')
     if budget_location: check_budget_location(budget_location)
     filters={'roster_date':['between',[start,end]]}
     if budget_location: filters['budget_location']=budget_location
+    if worker:
+        if agency and frappe.db.get_value('Agency Worker',worker,'agency')!=agency:
+            return []
+        filters['worker']=worker
+    elif agency:
+        agency_workers=frappe.get_all('Agency Worker',filters={'agency':agency},pluck='name')
+        if not agency_workers: return []
+        filters['worker']=['in',agency_workers]
     rows=[]
+    worker_cache={}
     for roster_row in frappe.get_list('Agency Roster',filters=filters,
             fields=['name','worker','roster_date','budget_location'],limit_page_length=0):
         if not is_supervisor(roster_row.worker):
@@ -37,8 +47,13 @@ def get_exceptions(from_date,to_date,budget_location=None,issue='All',review_sta
         attendance_name=frappe.db.get_value('Agency Attendance',{'roster':roster_row.name})
         if not attendance_name: continue
         attendance=frappe.get_doc('Agency Attendance',attendance_name)
-        worker_name=frappe.db.get_value('Agency Worker',roster_row.worker,'worker_name') or roster_row.worker
+        if roster_row.worker not in worker_cache:
+            worker_cache[roster_row.worker]=frappe.db.get_value('Agency Worker',roster_row.worker,
+                ['worker_name','staff_id','agency'],as_dict=True) or frappe._dict()
+        worker_data=worker_cache[roster_row.worker]
+        worker_name=worker_data.worker_name or roster_row.worker
         for result in attendance.results:
+            if shift and result.shift!=shift: continue
             issues=[]
             if result.status=='Needs Review': issues.append('Missing Punch')
             if result.status=='Half Day': issues.append('Half Day')
@@ -49,7 +64,8 @@ def get_exceptions(from_date,to_date,budget_location=None,issue='All',review_sta
             punch_status=result.punch_approval_status or 'Pending'
             if review_status!='All' and punch_status!=review_status: continue
             rows.append(dict(attendance=attendance.name,roster=roster_row.name,roster_duty=result.roster_duty,
-                worker=roster_row.worker,worker_name=worker_name,date=roster_row.roster_date,budget_location=roster_row.budget_location,
+                worker=roster_row.worker,worker_name=worker_name,staff_id=worker_data.staff_id,
+                agency=worker_data.agency,date=roster_row.roster_date,budget_location=roster_row.budget_location,
                 shift=result.shift,first_in=result.first_in,last_out=result.last_out,worked_hours=result.worked_hours or 0,
                 required_hours=result.required_hours or 0,shortfall_hours=result.shortfall_hours or 0,
                 status=result.status,late_entry=result.late_entry,early_exit=result.early_exit,issues=', '.join(issues),
@@ -137,4 +153,6 @@ def approve_punch(attendance,roster_duty,remarks):
     doc.flags.attendance_exception=True
     doc.save()
     return dict(attendance=doc.name,approved_by=frappe.session.user)
+
+
 
