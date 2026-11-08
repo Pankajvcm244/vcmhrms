@@ -40,7 +40,7 @@ frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
         if(!rows.length)return frappe.msgprint(__('There are no loaded attendance rows to export.'));
         const columns=[['Agency Staff Name','worker_name'],['Agency Staff ID','staff_id'],['Agency','agency'],
             ['Date','date'],['Shift','shift'],['First In','first_in'],['Last Out','last_out'],
-            ['Worked Hours','worked_hours'],['Required Hours','required_hours'],['Status','status'],
+            ['Worked Duration','worked_duration'],['Required Duration','required_duration'],['Status','status'],
             ['Flags','issues'],['Punch Approval','punch_approval_status'],['Approved By','punch_approved_by'],
             ['Approval Remarks','punch_approval_remarks']];
         const quote=value=>`"${String(value??'').replaceAll('"','""')}"`;
@@ -64,7 +64,7 @@ frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
         <table class="table table-bordered"><thead><tr><th>Worker</th><th>Date</th><th>Shift</th><th>First In</th><th>Last Out</th>
         <th>Worked</th><th>Required</th><th>Status</th><th>Flags</th><th>Punch Approval</th><th>Approved By</th><th>Action</th></tr></thead><tbody>`+
         rows.map((row,index)=>`<tr><td>${esc(row.worker_name)}</td><td>${esc(displayDate(row.date))}</td><td>${esc(row.shift)}</td>
-        <td>${esc(displayDatetime(row.first_in))}</td><td>${esc(displayDatetime(row.last_out))}</td><td>${row.worked_hours}</td><td>${row.required_hours}</td>
+        <td>${esc(displayDatetime(row.first_in))}</td><td>${esc(displayDatetime(row.last_out))}</td><td>${esc(row.worked_duration)}</td><td>${esc(row.required_duration)}</td>
         <td>${esc(row.status)}</td><td>${esc(row.issues)}</td><td>${esc(row.punch_approval_status)}</td><td>${esc(row.punch_approved_by)}</td>
         <td><button class="btn btn-xs btn-primary correct" data-index="${index}">Correct / Exception</button>
         ${row.punch_approval_status==='Pending'?`<button class="btn btn-xs btn-default approve ml-1" data-index="${index}">Approve Punch</button>`:''}</td></tr>`).join('')+'</tbody></table>');

@@ -38,6 +38,7 @@
       "fieldname": "required_hours",
       "label": "Required Hours",
       "fieldtype": "Float",
+      "description": "Minimum net worked duration required for Present after deducting Break Minutes. This shift value—not a fixed 8 hours—controls attendance. Enter decimal hours here; operational pages display HH:MM.",
       "default": 8,
       "reqd": 1
     },
@@ -45,53 +46,66 @@
       "fieldname": "half_day_hours",
       "label": "Half Day Hours",
       "fieldtype": "Float",
-      "default": 4
+      "description": "Minimum net worked duration required for Half Day. Below this shift value attendance is Absent. This value—not a fixed 4 hours—controls attendance. Operational pages display HH:MM.",
+      "default": 4,
+      "reqd": 1
     },
     {
       "fieldname": "break_minutes",
       "label": "Break Minutes",
       "fieldtype": "Int",
-      "default": 0
+      "default": 0,
+      "description": "Unpaid break deducted once from the elapsed time between First In and Last Out. Example: 09:00–18:00 with 60 break minutes gives 08:00 worked. Keep 0 when no automatic break deduction is required."
     },
     {
       "fieldname": "early_minutes",
       "label": "Early Minutes",
       "fieldtype": "Int",
-      "default": 30
+      "default": 30,
+      "hidden": 1,
+      "description": "Deprecated compatibility field. Punch capture is controlled by the maximum capture fields."
     },
     {
       "fieldname": "late_minutes",
       "label": "Late Minutes",
       "fieldtype": "Int",
-      "default": 30
+      "default": 30,
+      "hidden": 1,
+      "description": "Deprecated compatibility field. Punch capture is controlled by the maximum capture fields."
     },
     {
       "fieldname": "max_before_ot_capture_hours",
       "label": "Maximum Before OT Capture Hours",
       "fieldtype": "Float",
       "default": 4,
-      "reqd": 1
+      "reqd": 1,
+      "description": "How far before shift start the system may search for this duty's punches. It is a punch-matching safety window, not approved OT. Keep it only as large as operationally necessary to avoid matching another shift's punches."
     },
     {
       "fieldname": "max_after_ot_capture_hours",
       "label": "Maximum After OT Capture Hours",
       "fieldtype": "Float",
       "default": 4,
-      "reqd": 1
+      "reqd": 1,
+      "description": "How far after shift end the system may search for this duty's punches. It is a punch-matching safety window, not approved OT. The attendance remains Pending until this window closes unless processed under an eligible rule."
     },
     {
       "fieldname": "late_entry_grace_minutes",
       "label": "Late Entry Grace Minutes",
       "fieldtype": "Int",
       "default": 15,
-      "reqd": 1
+      "reqd": 1,
+      "depends_on": "eval:doc.mode=='Fixed'",
+      "description": "Fixed shifts only. Late Entry is flagged when First In is later than Start Time plus these minutes. This grace does not add worked time or change Required Hours."
     },
     {
       "fieldname": "early_exit_grace_minutes",
       "label": "Early Exit Grace Minutes",
       "fieldtype": "Int",
       "default": 15,
-      "reqd": 1
+      "reqd": 1,
+      "depends_on": "eval:doc.mode=='Fixed'",
+      "description": "Fixed shifts only. Early Exit is flagged when Last Out is earlier than End Time minus these minutes. This grace does not add worked time or change Required Hours."
     }
   ],
   "field_order": [

@@ -6,6 +6,7 @@ from frappe.utils import add_days, get_datetime, getdate, now_datetime
 from vcmhrms.agency_worker.service import check_budget_location, recalculate
 from vcmhrms.agency_worker.permissions import require_supervisor, is_supervisor
 from vcmhrms.agency_worker.period_lock import assert_unlocked
+from vcmhrms.agency_worker.duration import hours_to_hhmm
 
 
 def _system_manager():
@@ -68,6 +69,9 @@ def get_exceptions(from_date,to_date,budget_location=None,worker=None,agency=Non
                 agency=worker_data.agency,date=roster_row.roster_date,budget_location=roster_row.budget_location,
                 shift=result.shift,first_in=result.first_in,last_out=result.last_out,worked_hours=result.worked_hours or 0,
                 required_hours=result.required_hours or 0,shortfall_hours=result.shortfall_hours or 0,
+                worked_duration=hours_to_hhmm(result.worked_hours),
+                required_duration=hours_to_hhmm(result.required_hours),
+                shortfall_duration=hours_to_hhmm(result.shortfall_hours),
                 status=result.status,late_entry=result.late_entry,early_exit=result.early_exit,issues=', '.join(issues),
                 corrected_first_in=result.corrected_first_in,corrected_last_out=result.corrected_last_out,
                 status_override=result.status_override,exception_reason=result.exception_reason,

@@ -26,9 +26,9 @@ frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
     function exportCsv(){
         if(!rows.length)return frappe.msgprint(__('There are no loaded OT rows to export.'));
         const columns=[['Agency Staff Name','worker_name'],['Agency Staff ID','staff_id'],['Agency','agency'],['Supervisor','supervisor_name'],
-            ['Date','date'],['Shift','shift'],['Planned Before','planned_before'],['Actual Before','actual_before'],
-            ['Approved Before','approved_before'],['Planned After','planned_after'],['Actual After','actual_after'],
-            ['Approved After','approved_after'],['OT Reason','reason'],['Status','status'],['Approved By','approved_by'],
+            ['Date','date'],['Shift','shift'],['Planned Before','planned_before_display'],['Actual Before','actual_before_display'],
+            ['Approved Before','approved_before_display'],['Planned After','planned_after_display'],['Actual After','actual_after_display'],
+            ['Approved After','approved_after_display'],['OT Reason','reason'],['Status','status'],['Approved By','approved_by'],
             ['Approved At','approved_at'],['Approval Remarks','remarks']];
         const quote=value=>`"${String(value??'').replaceAll('"','""')}"`;
         const csv=[columns.map(column=>quote(column[0])).join(','),...rows.map(row=>
@@ -53,16 +53,21 @@ frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
             <th>Approved By</th><th>Approved At</th><th>Approval Remarks</th></tr></thead><tbody>`+
             rows.map((row,index)=>{const locked=row.status!=='Pending';return `<tr><td><input type="checkbox" class="select-row" data-index="${index}" ${locked?'disabled':''}></td>
             <td>${esc(row.worker_name)}</td><td>${esc(row.staff_id)}</td><td>${esc(row.agency)}</td><td>${esc(row.supervisor_name)}</td><td>${esc(row.date)}</td><td>${esc(row.shift)}</td>
-            <td>${row.planned_before}</td><td>${row.actual_before}</td><td><input class="form-control before" data-index="${index}" type="number" min="0" max="${row.actual_before}" step="0.25" value="${row.approved_before}" ${locked?'disabled':''}></td>
-            <td>${row.planned_after}</td><td>${row.actual_after}</td><td><input class="form-control after" data-index="${index}" type="number" min="0" max="${row.actual_after}" step="0.25" value="${row.approved_after}" ${locked?'disabled':''}></td>
+            <td>${esc(row.planned_before_display)}</td><td>${esc(row.actual_before_display)}</td><td><input class="form-control before" data-index="${index}" type="text" placeholder="HH:MM" value="${esc(row.approved_before_display)}" ${locked?'disabled':''}></td>
+            <td>${esc(row.planned_after_display)}</td><td>${esc(row.actual_after_display)}</td><td><input class="form-control after" data-index="${index}" type="text" placeholder="HH:MM" value="${esc(row.approved_after_display)}" ${locked?'disabled':''}></td>
             <td>${esc(row.reason)}</td><td>${esc(row.status)}</td><td>${esc(row.approved_by)}</td><td>${esc(row.approved_at)}</td><td>${esc(row.remarks)}</td></tr>`;}).join('')+'</tbody></table>');
         body.find('.select-all').on('change',function(){body.find('.select-row:not(:disabled)').prop('checked',this.checked);});
+    }
+    function parseDuration(value) {
+        const match=String(value||'').trim().match(/^(\d{1,3}):([0-5]\d)$/);
+        if(!match)frappe.throw(__('Enter approval duration as HH:MM, for example 01:30.'));
+        return Number(match[1])+Number(match[2])/60;
     }
     function selected() {
         return body.find('.select-row:checked').map(function(){
             const index=Number(this.dataset.index),row={...rows[index]};
-            row.approved_before=Number(body.find(`.before[data-index="${index}"]`).val()||0);
-            row.approved_after=Number(body.find(`.after[data-index="${index}"]`).val()||0);
+            row.approved_before=parseDuration(body.find(`.before[data-index="${index}"]`).val());
+            row.approved_after=parseDuration(body.find(`.after[data-index="${index}"]`).val());
             return row;
         }).get();
     }

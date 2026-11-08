@@ -4,6 +4,7 @@
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, format_datetime
 from vcmhrms.agency_worker.service import check_budget_location
+from vcmhrms.agency_worker.duration import hours_to_hhmm
 
 
 def execute(filters=None):
@@ -15,14 +16,14 @@ def execute(filters=None):
         ('staff_id','Agency Staff ID','Data',None),('agency','Agency','Link','Agency'),('date','Date','Date',None),
         ('day_type','Duty / Off','Data',None),('shift','Shift','Data',None),('planned_start','Planned Start','Data',None),
         ('planned_end','Planned End','Data',None),('first_in','Inferred IN','Data',None),
-        ('last_out','Inferred OUT','Data',None),('worked_hours','Hours','Float',None),
-        ('required_hours','Required Hours','Float',None),('shortfall_hours','Shortfall','Float',None),
+        ('last_out','Inferred OUT','Data',None),('worked_hours','Worked Duration','Data',None),
+        ('required_hours','Required Duration','Data',None),('shortfall_hours','Shortfall','Data',None),
         ('late_entry','Late Entry','Check',None),('early_exit','Early Exit','Check',None),
         ('nearby_punches','Raw Punches','Data',None),
-        ('planned_before_ot','Planned OT Before Shift','Float',None),('actual_before_ot','OT Before Shift','Float',None),
-        ('approved_before_ot','Approved OT Before Shift','Float',None),
-        ('planned_after_ot','Planned OT After Shift','Float',None),('actual_after_ot','OT After Shift','Float',None),
-        ('approved_after_ot','Approved OT After Shift','Float',None),('ot_reason','OT Reason','Data',None),
+        ('planned_before_ot','Planned OT Before Shift','Data',None),('actual_before_ot','OT Before Shift','Data',None),
+        ('approved_before_ot','Approved OT Before Shift','Data',None),
+        ('planned_after_ot','Planned OT After Shift','Data',None),('actual_after_ot','OT After Shift','Data',None),
+        ('approved_after_ot','Approved OT After Shift','Data',None),('ot_reason','OT Reason','Data',None),
         ('ot_approval_status','OT Approval','Data',None),('ot_approved_by','OT Approved By','Link','User'),
         ('punch_approval_status','Punch Approval','Data',None),('punch_approved_by','Punch Approved By','Link','User'),
         ('status','Status','Data',None),('exception','Exception','Data',None)]
@@ -67,14 +68,16 @@ def execute(filters=None):
             has_ot=any(float(value or 0)>0 for value in (duty.planned_before_ot_hours,
                 result.actual_before_ot_hours,duty.planned_after_ot_hours,result.actual_after_ot_hours))
             data.append(dict(base,shift=duty.shift,planned_start=format_datetime(duty.start_datetime,'HH:mm'),planned_end=format_datetime(duty.end_datetime,'HH:mm'),
-                planned_before_ot=duty.planned_before_ot_hours,planned_after_ot=duty.planned_after_ot_hours,
+                planned_before_ot=hours_to_hhmm(duty.planned_before_ot_hours),planned_after_ot=hours_to_hhmm(duty.planned_after_ot_hours),
                 ot_reason=duty.ot_reason,first_in=format_datetime(result.first_in,'HH:mm') if result.first_in else '',last_out=format_datetime(result.last_out,'HH:mm') if result.last_out else '',nearby_punches=nearby_punches,
-                worked_hours=result.worked_hours,required_hours=result.required_hours,shortfall_hours=result.shortfall_hours,
-                late_entry=result.late_entry,early_exit=result.early_exit,actual_before_ot=result.actual_before_ot_hours,
-                actual_after_ot=result.actual_after_ot_hours,approved_before_ot=result.approved_before_ot_hours,
-                approved_after_ot=result.approved_after_ot_hours,
+                worked_hours=hours_to_hhmm(result.worked_hours),required_hours=hours_to_hhmm(result.required_hours),
+                shortfall_hours=hours_to_hhmm(result.shortfall_hours),late_entry=result.late_entry,early_exit=result.early_exit,
+                actual_before_ot=hours_to_hhmm(result.actual_before_ot_hours),actual_after_ot=hours_to_hhmm(result.actual_after_ot_hours),
+                approved_before_ot=hours_to_hhmm(result.approved_before_ot_hours),approved_after_ot=hours_to_hhmm(result.approved_after_ot_hours),
                 ot_approval_status=(result.ot_approval_status or 'Pending') if has_ot else '',
                 ot_approved_by=result.approved_by,punch_approval_status=result.punch_approval_status,
                 punch_approved_by=result.punch_approved_by,status=result.status or 'Pending',exception=exception))
     return columns,data
+
+
 

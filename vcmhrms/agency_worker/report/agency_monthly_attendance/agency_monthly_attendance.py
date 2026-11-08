@@ -11,6 +11,7 @@ from frappe.utils import today
 from vcmhrms.agency_worker.period_lock import period_dates
 from vcmhrms.agency_worker.permissions import is_supervisor
 from vcmhrms.agency_worker.service import check_budget_location
+from vcmhrms.agency_worker.duration import hours_to_hhmm
 
 
 
@@ -80,7 +81,7 @@ def execute(filters=None):
     columns += [dict(fieldname='present_days',label='Present',fieldtype='Int',width=75),
         dict(fieldname='half_days',label='Half Days',fieldtype='Int',width=80),
         dict(fieldname='absent_days',label='Absent',fieldtype='Int',width=75),
-        dict(fieldname='approved_ot',label='Approved OT',fieldtype='Float',width=95)]
+        dict(fieldname='approved_ot',label='Approved OT',fieldtype='Data',width=95)]
     if not workers: return columns,[],f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. ✓ means no supervisor action is pending.'
     names=[w.name for w in workers]
     rosters=frappe.get_all('Agency Roster',filters={'worker':['in',names],'roster_date':['between',[start,end]]},fields=['name','worker','roster_date','day_type'])
@@ -129,7 +130,7 @@ def execute(filters=None):
                 pending=any((x.status in ('Pending','Needs Review') or x.ot_approval_status=='Pending' or x.punch_approval_status=='Pending') for x in items)
                 code+=flags+('' if pending else ' ✓')
             row[fieldname]=code
-        row.approved_ot=round(row.approved_ot,2); data.append(row)
+        row.approved_ot=hours_to_hhmm(row.approved_ot); data.append(row)
     message=(f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. '
         'Codes: P = Present; HD = Half Day; A = Absent; OFF = Weekly Off; '
         'PD = Pending (shift or punch-capture window not completed); NR = Needs Review; '

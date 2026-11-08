@@ -7,6 +7,8 @@ frappe.ui.form.on('Agency Shift', {
 });
 function update_hint(frm) {
     frm.set_intro(frm.doc.mode === 'Flexy'
-        ? __('Flexy uses the roster time window and required hours. No late-entry deduction is applied.')
-        : __('End time at or before start time defaults to the following day. Maximum OT capture hours allow actual OT to exceed planned OT; overlapping capture windows are split between adjacent duties.'));
+        ? __('Flexy: attendance is based on worked duration. Start and End Time anchor punches to the correct duty; Late Entry and Early Exit grace are not applicable.')
+        : __('Fixed: Start and End Time control punctuality. End time at or before start time means the duty ends the following day.'));
 }
+
+

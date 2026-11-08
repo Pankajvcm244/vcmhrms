@@ -7,6 +7,7 @@ from frappe.utils import getdate, now_datetime
 from vcmhrms.agency_worker.service import check_budget_location
 from vcmhrms.agency_worker.permissions import is_supervisor, require_supervisor
 from vcmhrms.agency_worker.period_lock import assert_unlocked
+from vcmhrms.agency_worker.duration import hours_to_hhmm
 
 
 def _is_system_manager():
@@ -70,6 +71,12 @@ def get_pending_ot(from_date,to_date,budget_location=None,worker=None,agency=Non
                 planned_before=roster_duty.planned_before_ot_hours or 0,actual_before=result.actual_before_ot_hours or 0,
                 approved_before=result.approved_before_ot_hours or 0,planned_after=roster_duty.planned_after_ot_hours or 0,
                 actual_after=result.actual_after_ot_hours or 0,approved_after=result.approved_after_ot_hours or 0,
+                planned_before_display=hours_to_hhmm(roster_duty.planned_before_ot_hours),
+                actual_before_display=hours_to_hhmm(result.actual_before_ot_hours),
+                approved_before_display=hours_to_hhmm(result.approved_before_ot_hours),
+                planned_after_display=hours_to_hhmm(roster_duty.planned_after_ot_hours),
+                actual_after_display=hours_to_hhmm(result.actual_after_ot_hours),
+                approved_after_display=hours_to_hhmm(result.approved_after_ot_hours),
                 reason=roster_duty.ot_reason,status=approval_status,approved_by=result.approved_by,
                 approved_at=result.approved_at,remarks=result.approval_remarks))
     return rows

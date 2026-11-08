@@ -121,10 +121,20 @@ Attendance, Shift Type, or Holiday List records.
 
 ### 5.3 Agency Shift
 
-- Stores start/end time, required hours, configurable half-day hours, break minutes,
-  punch-capture limits, and late/early grace minutes.
+- `Mode` is either `Fixed` or `Flexy`.
+- Both modes store Start Time, End Time, Required Hours, Half Day Hours, Break Minutes,
+  and maximum before/after punch-capture hours. Start and End Time remain necessary
+  to associate punches with the correct roster date, night duty, or multiple duty.
+- Fixed mode additionally uses Late Entry Grace Minutes and Early Exit Grace Minutes.
+- Flexy mode determines attendance from worked duration and does not raise Late Entry
+  or Early Exit merely because the punch differs from the nominal shift time.
+- Legacy Early Minutes and Late Minutes are hidden compatibility fields; they must not
+  be presented as separate configuration because maximum capture hours already define
+  the punch-matching envelope.
 - `Half Day Hours` must be used directly. Falling back to half of Required Hours is
   allowed only when Half Day Hours is blank or zero.
+- Decimal hours may remain internal storage, but every user-facing form, page, report,
+  and export displays durations as `HH:MM` (for example, `07:57`, not `7.95`).
 - Only Agency Worker Manager and System Manager should change shift definitions.
 
 ### 5.4 Agency Holiday List
@@ -236,14 +246,25 @@ Attendance, Shift Type, or Holiday List records.
 8. Worked Hours at or above Required Hours is `Present`.
 9. Worked Hours below Required Hours but at or above Half Day Hours is `Half Day`.
 10. Worked Hours below Half Day Hours is `Absent`.
-11. Late Entry is set only when First In is later than shift start plus the configured
-    grace minutes.
-12. Early Exit is set only when Last Out is earlier than shift end minus the configured
-    grace minutes.
-13. Actual Before OT and Actual After OT are calculated separately.
-14. A historical punch received later recalculates the affected date and may replace
+11. A complete punch pair below Required Hours also carries a `Short Hours` review
+    flag. `Short Hours` is not a fourth payroll status: the payable status remains Half
+    Day or Absent. A supervisor may grant a documented Present status override.
+12. Late Entry is set only for Fixed mode when First In is later than shift start plus
+    the configured grace minutes.
+13. Early Exit is set only for Fixed mode when Last Out is earlier than shift end minus
+    the configured grace minutes.
+14. A missed-punch result cannot become Present automatically. A supervisor must add
+    the corrected punch pair or a documented Present override, which records the login,
+    timestamp, and reason.
+15. Total eligible OT is worked duration beyond Required Hours. Extra work below
+    `01:00` is not eligible OT. Once the extra duration reaches `01:00`, eligible OT is
+    retained as its actual `HH:MM` duration and is still subject to supervisor approval.
+16. Fixed-mode eligible OT may be presented separately as before-shift and after-shift
+    OT. Flexy mode uses total duration beyond Required Hours and must not create OT merely
+    because punches differ from nominal Start or End Time.
+17. A historical punch received later recalculates the affected date and may replace
     `Pending`, `Needs Review`, or calculated values while the period is unlocked.
-15. A calculation change resets any affected OT approval so the supervisor reviews
+18. A calculation change resets any affected OT approval so the supervisor reviews
     the new values.
 
 ## 10. Scheduled and manual processing
@@ -391,6 +412,12 @@ Every change to `vcmhrms/agency_worker` should verify at least:
     Agency/Agency Staff filters correctly, and export only the currently filtered rows.
 29. Roster vs Attendance defaults to the active payroll period, and Monthly Attendance
     advances its default payroll month after the 25th, including December-to-January rollover.
+30. All user-facing worked, required, shortfall, and OT durations use `HH:MM`; internal
+    decimal storage must never leak into a page, report, or CSV export.
+31. Fixed and Flexy modes follow their distinct punctuality rules; Short Hours remains
+    a review flag while Half Day/Absent remains the payable status.
+32. OT below `01:00` is zero, while eligible OT of `01:00` or more is displayed and
+    approved as an `HH:MM` duration.
 
 ## 18. Initial agency-data import rules
 
