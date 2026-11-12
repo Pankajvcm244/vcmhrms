@@ -66,6 +66,7 @@ def get_pending_ot(from_date,to_date,budget_location=None,worker=None,agency=Non
             if status and status!='All' and approval_status!=status: continue
             rows.append(dict(attendance=attendance.name,roster_duty=result.roster_duty,worker=roster.worker,
                 worker_name=worker_name,date=roster.roster_date,budget_location=roster.budget_location,shift=result.shift,
+                first_in=result.first_in,last_out=result.last_out,
                 staff_id=worker.staff_id,agency=worker.agency,supervisor=worker.supervisor,
                 supervisor_name=worker.supervisor_name,
                 planned_before=roster_duty.planned_before_ot_hours or 0,actual_before=result.actual_before_ot_hours or 0,

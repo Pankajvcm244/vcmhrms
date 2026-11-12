@@ -122,19 +122,20 @@ def execute(filters=None):
                 continue
             else:
                 code=_day_status(items)
+                if code=='PD':
+                    row[fieldname]=''
+                    continue
                 if code=='P': row.present_days+=1
                 elif code=='HD': row.half_days+=1
                 elif code=='A': row.absent_days+=1
                 row.approved_ot+=sum(float(x.approved_ot or 0) for x in items)
-                flags=(' L' if any(x.late_entry for x in items) else '')+(' E' if any(x.early_exit for x in items) else '')
                 pending=any((x.status in ('Pending','Needs Review') or x.ot_approval_status=='Pending' or x.punch_approval_status=='Pending') for x in items)
-                code+=flags+('' if pending else ' ✓')
+                code+=('' if pending else ' ✓')
             row[fieldname]=code
         row.approved_ot=hours_to_hhmm(row.approved_ot); data.append(row)
     message=(f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. '
         'Codes: P = Present; HD = Half Day; A = Absent; OFF = Weekly Off; '
-        'PD = Pending (shift or punch-capture window not completed); NR = Needs Review; '
-        'L = Late Entry; E = Early Exit; — = No roster. '
+        'NR = Needs Review; — = No roster. Pending attendance is left blank until finalized. '
         '✓ = no pending punch or OT action. Agency holidays use the agency holiday colour.')
     return columns,data,message
 

@@ -20,7 +20,7 @@ frappe.pages['ag-attend-review'].on_page_load=function(wrapper) {
     const worker=page.add_field({fieldname:'worker',label:'Agency Staff',fieldtype:'Link',options:'Agency Worker',change:applyFilters});
     const agency=page.add_field({fieldname:'agency',label:'Agency',fieldtype:'Link',options:'Agency',change:applyFilters});
     const shift=page.add_field({fieldname:'shift',label:'Shift',fieldtype:'Link',options:'Agency Shift',change:applyFilters});
-    const issue=page.add_field({fieldname:'issue',label:'Issue',fieldtype:'Select',options:'All\nMissing Punch\nHalf Day\nAbsent\nLate Entry\nEarly Exit',default:'All',change:applyFilters});
+    const issue=page.add_field({fieldname:'issue',label:'Issue',fieldtype:'Select',options:'All\nMissing Punch\nHalf Day\nAbsent',default:'All',change:applyFilters});
     const reviewStatus=page.add_field({fieldname:'review_status',label:'Punch Approval',fieldtype:'Select',options:'Pending\nApproved\nAll',default:'Pending',change:applyFilters});
     const body=$('<div class="mt-3" style="overflow:auto"></div>').appendTo(page.main);
     const esc=value=>frappe.utils.escape_html(String(value??''));

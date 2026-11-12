@@ -20,7 +20,7 @@ def recalculate(roster):
     duties=[]
     for row in roster.duties:
         shift=frappe.get_doc('Agency Shift', row.shift)
-        duties.append(dict(id=row.name, shift=row.shift, start=get_datetime(row.start_datetime),
+        duties.append(dict(id=row.name, shift=row.shift, mode=shift.mode or 'Fixed', start=get_datetime(row.start_datetime),
             end=get_datetime(row.end_datetime), early=shift.early_minutes or 0,
             late=shift.late_minutes or 0, required_hours=shift.required_hours,
             half_day_hours=shift.half_day_hours or 0, break_minutes=shift.break_minutes or 0,
@@ -42,7 +42,7 @@ def recalculate(roster):
     for name in neighbours:
         for row in frappe.get_doc('Agency Roster', name).duties:
             shift=frappe.get_doc('Agency Shift',row.shift)
-            duties.append(dict(id=row.name,shift=row.shift,start=get_datetime(row.start_datetime),
+            duties.append(dict(id=row.name,shift=row.shift,mode=shift.mode or 'Fixed',start=get_datetime(row.start_datetime),
                 end=get_datetime(row.end_datetime),early=shift.early_minutes or 0,late=shift.late_minutes or 0,
                 required_hours=shift.required_hours,half_day_hours=shift.half_day_hours or 0,
                 break_minutes=shift.break_minutes or 0,
@@ -74,12 +74,11 @@ def recalculate(roster):
         result.update(correction)
         has_ot=any(float(result.get(field) or 0)>0 for field in (
             'planned_before_ot_hours','actual_before_ot_hours','planned_after_ot_hours','actual_after_ot_hours'))
-        needs_punch_review=(result.get('status') in ('Half Day','Absent','Needs Review') or
-                            result.get('late_entry') or result.get('early_exit'))
+        needs_punch_review=result.get('status') in ('Half Day','Absent','Needs Review')
         result['ot_approval_status']='Pending' if has_ot else 'Not Required'
         result['punch_approval_status']='Pending' if needs_punch_review else 'Not Required'
-    doc.late_entry=int(any(result.get('late_entry') for result in current_results))
-    doc.early_exit=int(any(result.get('early_exit') for result in current_results))
+    doc.late_entry=0
+    doc.early_exit=0
     doc.worked_hours=round(sum(float(result.get('worked_hours') or 0) for result in current_results),2)
     fields=['roster_duty','shift','first_in','last_out','worked_hours','required_hours','shortfall_hours',
             'late_entry','early_exit','planned_before_ot_hours','actual_before_ot_hours',
@@ -126,4 +125,6 @@ def recalculate_attendance(roster):
     doc.check_permission('write')
     check_budget_location(doc.budget_location)
     return recalculate(doc)
+
+
 

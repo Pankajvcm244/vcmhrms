@@ -125,9 +125,8 @@ Attendance, Shift Type, or Holiday List records.
 - Both modes store Start Time, End Time, Required Hours, Half Day Hours, Break Minutes,
   and maximum before/after punch-capture hours. Start and End Time remain necessary
   to associate punches with the correct roster date, night duty, or multiple duty.
-- Fixed mode additionally uses Late Entry Grace Minutes and Early Exit Grace Minutes.
-- Flexy mode determines attendance from worked duration and does not raise Late Entry
-  or Early Exit merely because the punch differs from the nominal shift time.
+- Attendance status is duration-based. Late Entry and Early Exit are not attendance
+  exceptions and are not displayed or sent for supervisor review.
 - Legacy Early Minutes and Late Minutes are hidden compatibility fields; they must not
   be presented as separate configuration because maximum capture hours already define
   the punch-matching envelope.
@@ -249,10 +248,17 @@ Attendance, Shift Type, or Holiday List records.
 11. A complete punch pair below Required Hours also carries a `Short Hours` review
     flag. `Short Hours` is not a fourth payroll status: the payable status remains Half
     Day or Absent. A supervisor may grant a documented Present status override.
-12. Late Entry is set only for Fixed mode when First In is later than shift start plus
-    the configured grace minutes.
-13. Early Exit is set only for Fixed mode when Last Out is earlier than shift end minus
-    the configured grace minutes.
+12. Late Entry and Early Exit remain zero-valued compatibility fields only. They must
+    not create review requests or appear in attendance pages and reports.
+14. Actual OT is the net Worked Hours above the duty's Required Hours; merely punching
+    after scheduled shift end does not create OT when a worker arrived late.
+15. Net extra duration below 01:00 is not OT. Once net extra duration reaches 01:00,
+    the complete extra duration is eligible for approval.
+16. Actual Before OT plus Actual After OT must equal eligible net OT and must never
+    exceed Worked Hours minus Required Hours.
+17. Agency OT Approval must show actual First In and Last Out beside the assigned
+    shift so the supervisor can verify the punch pair before approving OT. Exports
+    must include the same punch timestamps.
 14. A missed-punch result cannot become Present automatically. A supervisor must add
     the corrected punch pair or a documented Present override, which records the login,
     timestamp, and reason.
@@ -284,7 +290,7 @@ Attendance, Shift Type, or Holiday List records.
   approval status. Changing a filter automatically refreshes the displayed results;
   the manual Load Exceptions action remains available.
 - Export CSV exports the currently loaded, filtered review rows.
-- Late Entry, Early Exit, Half Day, Absent, and Needs Review require punch review.
+- Half Day, Absent, and Needs Review require attendance review.
 - A supervisor with the required role may acknowledge the calculated result with mandatory remarks.
 - A supervisor with the required role may enter a corrected first/last pair or a justified status
   override with a mandatory reason.
@@ -325,7 +331,7 @@ Attendance, Shift Type, or Holiday List records.
   Location, every period date with weekday, Present/Half Day/Absent totals, and
   approved OT.
 - Codes are: `P` Present, `HD` Half Day, `A` Absent, `OFF` Weekly Off, `PD` Pending,
-  `NR` Needs Review, `L` Late Entry, `E` Early Exit, and `H` Agency Holiday.
+  `NR` Needs Review and `H` Agency Holiday.
 - Absent is displayed as `A`, without an exclamation mark.
 - A tick (`✓`) appears only when the date has no pending attendance, punch review, or
   OT approval action.
@@ -375,8 +381,9 @@ Attendance, Shift Type, or Holiday List records.
 Every change to `vcmhrms/agency_worker` should verify at least:
 
 1. Normal day shift: on-time complete pair produces Present with no pending review.
-2. Late arrival beyond grace sets Late Entry and punch approval Pending.
-3. Early departure beyond grace sets Early Exit and punch approval Pending.
+2. Late arrival alone does not create an attendance review request.
+3. Early departure alone does not create an attendance review request; worked duration
+   still determines Present, Half Day, or Absent.
 4. Worked hours between Half Day and Required Hours produces Half Day.
 5. Worked hours below Half Day Hours produces Absent.
 6. One punch finalizes as Needs Review; no punch finalizes as Absent.

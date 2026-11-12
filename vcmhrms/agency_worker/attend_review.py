@@ -59,8 +59,6 @@ def get_exceptions(from_date,to_date,budget_location=None,worker=None,agency=Non
             if result.status=='Needs Review': issues.append('Missing Punch')
             if result.status=='Half Day': issues.append('Half Day')
             if result.status=='Absent': issues.append('Absent')
-            if result.late_entry: issues.append('Late Entry')
-            if result.early_exit: issues.append('Early Exit')
             if not issues or (issue!='All' and issue not in issues): continue
             punch_status=result.punch_approval_status or 'Pending'
             if review_status!='All' and punch_status!=review_status: continue
@@ -72,7 +70,7 @@ def get_exceptions(from_date,to_date,budget_location=None,worker=None,agency=Non
                 worked_duration=hours_to_hhmm(result.worked_hours),
                 required_duration=hours_to_hhmm(result.required_hours),
                 shortfall_duration=hours_to_hhmm(result.shortfall_hours),
-                status=result.status,late_entry=result.late_entry,early_exit=result.early_exit,issues=', '.join(issues),
+                status=result.status,issues=', '.join(issues),
                 corrected_first_in=result.corrected_first_in,corrected_last_out=result.corrected_last_out,
                 status_override=result.status_override,exception_reason=result.exception_reason,
                 exception_by=result.exception_by,exception_at=result.exception_at,
@@ -133,7 +131,7 @@ def apply_exception(attendance,roster_duty,reason,corrected_first_in=None,correc
 
 @frappe.whitelist(methods=['POST'])
 def approve_punch(attendance,roster_duty,remarks):
-    """Acknowledge calculated late/early/short-hours attendance without changing punches or status."""
+    """Acknowledge short-hours, absent, or missing-punch attendance without changing punches or status."""
     _check_role()
     remarks=(remarks or '').strip()
     if not remarks: frappe.throw('Punch approval remarks are required.')
@@ -148,7 +146,7 @@ def approve_punch(attendance,roster_duty,remarks):
     if not result: frappe.throw('Attendance duty changed; reload the review page.')
     if (result.punch_approval_status or 'Pending')!='Pending':
         frappe.throw('This punch exception is already reviewed.')
-    if not (result.late_entry or result.early_exit or result.status in ('Half Day','Absent','Needs Review')):
+    if result.status not in ('Half Day','Absent','Needs Review'):
         frappe.throw('This attendance has no punch exception requiring approval.')
     result.punch_approval_status='Approved'
     result.punch_approved_by=frappe.session.user

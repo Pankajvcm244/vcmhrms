@@ -21,12 +21,23 @@ frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
     const status=page.add_field({fieldname:'status',label:'Status',fieldtype:'Select',options:'Pending\nApproved\nRejected\nAll',default:'Pending',change:applyFilters});
     const body=$('<div class="mt-3" style="overflow:auto"></div>').appendTo(page.main);
     const esc=value=>frappe.utils.escape_html(String(value??''));
+    const displayDate=value=>{
+        if(!value)return '';
+        const [year,month,day]=String(value).slice(0,10).split('-');
+        return day&&month&&year?`${day}-${month}-${year}`:String(value);
+    };
+    const displayDatetime=value=>{
+        if(!value)return '';
+        const text=String(value).replace('T',' ');
+        return `${displayDate(text.slice(0,10))} ${text.slice(11,19)}`.trim();
+    };
     let rows=[];
     let loadRequest=0;
     function exportCsv(){
         if(!rows.length)return frappe.msgprint(__('There are no loaded OT rows to export.'));
         const columns=[['Agency Staff Name','worker_name'],['Agency Staff ID','staff_id'],['Agency','agency'],['Supervisor','supervisor_name'],
-            ['Date','date'],['Shift','shift'],['Planned Before','planned_before_display'],['Actual Before','actual_before_display'],
+            ['Date','date'],['Shift','shift'],['First In','first_in'],['Last Out','last_out'],
+            ['Planned Before','planned_before_display'],['Actual Before','actual_before_display'],
             ['Approved Before','approved_before_display'],['Planned After','planned_after_display'],['Actual After','actual_after_display'],
             ['Approved After','approved_after_display'],['OT Reason','reason'],['Status','status'],['Approved By','approved_by'],
             ['Approved At','approved_at'],['Approval Remarks','remarks']];
@@ -47,12 +58,12 @@ frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
         if(request!==loadRequest)return;
         rows=message||[];
         body.html(`<p>${rows.length} OT duties. Managers see only workers assigned to them as Supervisor.</p><table class="table table-bordered"><thead><tr>
-            <th><input type="checkbox" class="select-all"></th><th>Worker</th><th>Staff ID</th><th>Agency</th><th>Supervisor</th><th>Date</th><th>Shift</th>
+            <th><input type="checkbox" class="select-all"></th><th>Worker</th><th>Staff ID</th><th>Agency</th><th>Supervisor</th><th>Date</th><th>Shift</th><th>First In</th><th>Last Out</th>
             <th>Planned Before</th><th>Actual Before</th><th>Approve Before</th>
             <th>Planned After</th><th>Actual After</th><th>Approve After</th><th>OT Reason</th><th>Status</th>
             <th>Approved By</th><th>Approved At</th><th>Approval Remarks</th></tr></thead><tbody>`+
             rows.map((row,index)=>{const locked=row.status!=='Pending';return `<tr><td><input type="checkbox" class="select-row" data-index="${index}" ${locked?'disabled':''}></td>
-            <td>${esc(row.worker_name)}</td><td>${esc(row.staff_id)}</td><td>${esc(row.agency)}</td><td>${esc(row.supervisor_name)}</td><td>${esc(row.date)}</td><td>${esc(row.shift)}</td>
+            <td>${esc(row.worker_name)}</td><td>${esc(row.staff_id)}</td><td>${esc(row.agency)}</td><td>${esc(row.supervisor_name)}</td><td>${esc(displayDate(row.date))}</td><td>${esc(row.shift)}</td><td>${esc(displayDatetime(row.first_in))}</td><td>${esc(displayDatetime(row.last_out))}</td>
             <td>${esc(row.planned_before_display)}</td><td>${esc(row.actual_before_display)}</td><td><input class="form-control before" data-index="${index}" type="text" placeholder="HH:MM" value="${esc(row.approved_before_display)}" ${locked?'disabled':''}></td>
             <td>${esc(row.planned_after_display)}</td><td>${esc(row.actual_after_display)}</td><td><input class="form-control after" data-index="${index}" type="text" placeholder="HH:MM" value="${esc(row.approved_after_display)}" ${locked?'disabled':''}></td>
             <td>${esc(row.reason)}</td><td>${esc(row.status)}</td><td>${esc(row.approved_by)}</td><td>${esc(row.approved_at)}</td><td>${esc(row.remarks)}</td></tr>`;}).join('')+'</tbody></table>');

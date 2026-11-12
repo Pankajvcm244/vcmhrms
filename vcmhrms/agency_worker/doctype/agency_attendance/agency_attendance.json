@@ -36,14 +36,16 @@
       "label": "Late Entry",
       "fieldtype": "Check",
       "read_only": 1,
-      "in_list_view": 1
+      "in_list_view": 0,
+      "hidden": 1
     },
     {
       "fieldname": "early_exit",
       "label": "Early Exit",
       "fieldtype": "Check",
       "read_only": 1,
-      "in_list_view": 1
+      "in_list_view": 0,
+      "hidden": 1
     },
     {
       "fieldname": "worked_hours",
