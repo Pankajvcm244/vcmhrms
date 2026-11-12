@@ -55,30 +55,40 @@ def get_pending_ot(from_date,to_date,budget_location=None,worker=None,agency=Non
         attendance=frappe.get_doc('Agency Attendance',attendance_name)
         roster_doc=frappe.get_doc('Agency Roster',roster.name)
         roster_duties={duty.name:duty for duty in roster_doc.duties}
+        is_weekly_off=roster_doc.day_type=='Weekly Off'
         worker_name=worker.worker_name or roster.worker
         for result in attendance.results:
             roster_duty=roster_duties.get(result.roster_duty)
-            if not roster_duty: continue
+            if not roster_duty and not (is_weekly_off and str(result.roster_duty).startswith('OFF-')): continue
             if not any((result.planned_before_ot_hours,result.actual_before_ot_hours,
                         result.planned_after_ot_hours,result.actual_after_ot_hours)):
                 continue
             approval_status=result.ot_approval_status or 'Pending'
             if status and status!='All' and approval_status!=status: continue
             rows.append(dict(attendance=attendance.name,roster_duty=result.roster_duty,worker=roster.worker,
-                worker_name=worker_name,date=roster.roster_date,budget_location=roster.budget_location,shift=result.shift,
+                worker_name=worker_name,date=roster.roster_date,budget_location=roster.budget_location,
+                shift=result.shift or 'Weekly Off',
                 first_in=result.first_in,last_out=result.last_out,
+                required_hours=result.required_hours or 0,worked_hours=result.worked_hours or 0,
+                required_hours_display=hours_to_hhmm(result.required_hours),
+                worked_hours_display=hours_to_hhmm(result.worked_hours),
                 staff_id=worker.staff_id,agency=worker.agency,supervisor=worker.supervisor,
                 supervisor_name=worker.supervisor_name,
-                planned_before=roster_duty.planned_before_ot_hours or 0,actual_before=result.actual_before_ot_hours or 0,
-                approved_before=result.approved_before_ot_hours or 0,planned_after=roster_duty.planned_after_ot_hours or 0,
+                planned_before=(roster_duty.planned_before_ot_hours if roster_duty else 0) or 0,
+                actual_before=result.actual_before_ot_hours or 0,
+                approved_before=result.approved_before_ot_hours or 0,
+                planned_after=(roster_duty.planned_after_ot_hours if roster_duty else 0) or 0,
                 actual_after=result.actual_after_ot_hours or 0,approved_after=result.approved_after_ot_hours or 0,
-                planned_before_display=hours_to_hhmm(roster_duty.planned_before_ot_hours),
+                actual_ot_display=hours_to_hhmm((result.actual_before_ot_hours or 0)+(result.actual_after_ot_hours or 0)),
+                approved_ot_display=hours_to_hhmm((result.approved_before_ot_hours or 0)+(result.approved_after_ot_hours or 0)),
+                planned_before_display=hours_to_hhmm(roster_duty.planned_before_ot_hours if roster_duty else 0),
                 actual_before_display=hours_to_hhmm(result.actual_before_ot_hours),
                 approved_before_display=hours_to_hhmm(result.approved_before_ot_hours),
-                planned_after_display=hours_to_hhmm(roster_duty.planned_after_ot_hours),
+                planned_after_display=hours_to_hhmm(roster_duty.planned_after_ot_hours if roster_duty else 0),
                 actual_after_display=hours_to_hhmm(result.actual_after_ot_hours),
                 approved_after_display=hours_to_hhmm(result.approved_after_ot_hours),
-                reason=roster_duty.ot_reason,status=approval_status,approved_by=result.approved_by,
+                reason=(roster_duty.ot_reason if roster_duty else 'Worked on Weekly Off'),status=approval_status,
+                approved_by=result.approved_by,
                 approved_at=result.approved_at,remarks=result.approval_remarks))
     return rows
 
@@ -115,17 +125,30 @@ def approve_ot(rows,remarks,decision='Custom'):
             if (row.ot_approval_status or 'Pending')!='Pending':
                 frappe.throw('This OT was already approved or rejected and is read-only.')
             roster_duty=roster_duties.get(row.roster_duty)
-            if not roster_duty: frappe.throw('Roster duty no longer exists; reload the approval page.')
+            is_weekly_off=roster.day_type=='Weekly Off' and str(row.roster_duty).startswith('OFF-')
+            if not roster_duty and not is_weekly_off:
+                frappe.throw('Roster duty no longer exists; reload the approval page.')
             if decision=='Planned':
-                before=min(roster_duty.planned_before_ot_hours or 0,row.actual_before_ot_hours or 0)
-                after=min(roster_duty.planned_after_ot_hours or 0,row.actual_after_ot_hours or 0)
+                if is_weekly_off:
+                    before,after=row.actual_before_ot_hours or 0,row.actual_after_ot_hours or 0
+                else:
+                    before=min(roster_duty.planned_before_ot_hours or 0,row.actual_before_ot_hours or 0)
+                    after=min(roster_duty.planned_after_ot_hours or 0,row.actual_after_ot_hours or 0)
             elif decision=='Actual':
                 before,after=row.actual_before_ot_hours or 0,row.actual_after_ot_hours or 0
             elif decision=='Reject':
                 before=after=0
             else:
-                before=float(request.get('approved_before') or 0)
-                after=float(request.get('approved_after') or 0)
+                if request.get('approved_total') is not None:
+                    approved_total=float(request.get('approved_total') or 0)
+                    actual_total=(row.actual_before_ot_hours or 0)+(row.actual_after_ot_hours or 0)
+                    if not 0<=approved_total<=actual_total:
+                        frappe.throw(f'Approval for {attendance.worker} {row.shift} exceeds actual OT.')
+                    before=min(row.actual_before_ot_hours or 0,approved_total)
+                    after=approved_total-before
+                else:
+                    before=float(request.get('approved_before') or 0)
+                    after=float(request.get('approved_after') or 0)
             actual_before=row.actual_before_ot_hours or 0
             actual_after=row.actual_after_ot_hours or 0
             if not 0<=before<=actual_before or not 0<=after<=actual_after:

@@ -37,9 +37,9 @@ frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
         if(!rows.length)return frappe.msgprint(__('There are no loaded OT rows to export.'));
         const columns=[['Agency Staff Name','worker_name'],['Agency Staff ID','staff_id'],['Agency','agency'],['Supervisor','supervisor_name'],
             ['Date','date'],['Shift','shift'],['First In','first_in'],['Last Out','last_out'],
-            ['Planned Before','planned_before_display'],['Actual Before','actual_before_display'],
-            ['Approved Before','approved_before_display'],['Planned After','planned_after_display'],['Actual After','actual_after_display'],
-            ['Approved After','approved_after_display'],['OT Reason','reason'],['Status','status'],['Approved By','approved_by'],
+            ['Total Shift Hours','required_hours_display'],['Total Worked Hours','worked_hours_display'],
+            ['OT Hours','actual_ot_display'],['Approved OT','approved_ot_display'],
+            ['OT Reason','reason'],['Status','status'],['Approved By','approved_by'],
             ['Approved At','approved_at'],['Approval Remarks','remarks']];
         const quote=value=>`"${String(value??'').replaceAll('"','""')}"`;
         const csv=[columns.map(column=>quote(column[0])).join(','),...rows.map(row=>
@@ -59,13 +59,11 @@ frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
         rows=message||[];
         body.html(`<p>${rows.length} OT duties. Managers see only workers assigned to them as Supervisor.</p><table class="table table-bordered"><thead><tr>
             <th><input type="checkbox" class="select-all"></th><th>Worker</th><th>Staff ID</th><th>Agency</th><th>Supervisor</th><th>Date</th><th>Shift</th><th>First In</th><th>Last Out</th>
-            <th>Planned Before</th><th>Actual Before</th><th>Approve Before</th>
-            <th>Planned After</th><th>Actual After</th><th>Approve After</th><th>OT Reason</th><th>Status</th>
+            <th>Total Shift Hours</th><th>Total Worked Hours</th><th>OT Hours</th><th>Approve OT</th><th>OT Reason</th><th>Status</th>
             <th>Approved By</th><th>Approved At</th><th>Approval Remarks</th></tr></thead><tbody>`+
             rows.map((row,index)=>{const locked=row.status!=='Pending';return `<tr><td><input type="checkbox" class="select-row" data-index="${index}" ${locked?'disabled':''}></td>
             <td>${esc(row.worker_name)}</td><td>${esc(row.staff_id)}</td><td>${esc(row.agency)}</td><td>${esc(row.supervisor_name)}</td><td>${esc(displayDate(row.date))}</td><td>${esc(row.shift)}</td><td>${esc(displayDatetime(row.first_in))}</td><td>${esc(displayDatetime(row.last_out))}</td>
-            <td>${esc(row.planned_before_display)}</td><td>${esc(row.actual_before_display)}</td><td><input class="form-control before" data-index="${index}" type="text" placeholder="HH:MM" value="${esc(row.approved_before_display)}" ${locked?'disabled':''}></td>
-            <td>${esc(row.planned_after_display)}</td><td>${esc(row.actual_after_display)}</td><td><input class="form-control after" data-index="${index}" type="text" placeholder="HH:MM" value="${esc(row.approved_after_display)}" ${locked?'disabled':''}></td>
+            <td>${esc(row.required_hours_display)}</td><td>${esc(row.worked_hours_display)}</td><td>${esc(row.actual_ot_display)}</td><td><input class="form-control approved-total" data-index="${index}" type="text" placeholder="HH:MM" value="${esc(row.approved_ot_display)}" ${locked?'disabled':''}></td>
             <td>${esc(row.reason)}</td><td>${esc(row.status)}</td><td>${esc(row.approved_by)}</td><td>${esc(row.approved_at)}</td><td>${esc(row.remarks)}</td></tr>`;}).join('')+'</tbody></table>');
         body.find('.select-all').on('change',function(){body.find('.select-row:not(:disabled)').prop('checked',this.checked);});
     }
@@ -77,8 +75,7 @@ frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
     function selected() {
         return body.find('.select-row:checked').map(function(){
             const index=Number(this.dataset.index),row={...rows[index]};
-            row.approved_before=parseDuration(body.find(`.before[data-index="${index}"]`).val());
-            row.approved_after=parseDuration(body.find(`.after[data-index="${index}"]`).val());
+            row.approved_total=parseDuration(body.find(`.approved-total[data-index="${index}"]`).val());
             return row;
         }).get();
     }
@@ -92,9 +89,8 @@ frappe.pages['ag-ot-approval'].on_page_load=function(wrapper) {
             }}); dialog.show();
     }
     page.set_primary_action(__('Load OT'),load);
-    page.add_inner_button(__('Approve Planned'),()=>approve('Planned'));
-    page.add_inner_button(__('Approve Actual'),()=>approve('Actual'));
-    page.add_inner_button(__('Save Custom'),()=>approve('Custom'));
+    page.add_inner_button(__('Approve OT'),()=>approve('Actual'));
+    page.add_inner_button(__('Approve Entered OT'),()=>approve('Custom'));
     page.add_inner_button(__('Reject'),()=>approve('Reject'));
     page.add_inner_button(__('Export CSV'),exportCsv);
     filtersReady=true;

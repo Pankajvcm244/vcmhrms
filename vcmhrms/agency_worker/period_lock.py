@@ -58,6 +58,18 @@ def lock_period(month,budget_location):
               or coalesce(ad.ot_approval_status,'Not Required')='Pending'
               or coalesce(ad.punch_approval_status,'Not Required')='Pending'
           )''',(budget_location,start,end))[0][0]
+    incomplete+=frappe.db.sql('''select count(*)
+        from `tabAgency Roster` r
+        join `tabAgency Attendance` a on a.roster=r.name
+        join `tabAgency Attendance Duty` ad on ad.parent=a.name
+        where r.budget_location=%s
+          and r.roster_date between %s and %s
+          and r.day_type='Weekly Off'
+          and (
+              coalesce(ad.status,'Pending') in ('Pending','Needs Review')
+              or coalesce(ad.ot_approval_status,'Not Required')='Pending'
+              or coalesce(ad.punch_approval_status,'Not Required')='Pending'
+          )''',(budget_location,start,end))[0][0]
     if incomplete:
         frappe.throw(
             f'Cannot lock this period: {incomplete} roster duties are missing attendance '
@@ -67,4 +79,6 @@ def lock_period(month,budget_location):
         'period_end':end,'budget_location':budget_location,'locked_by':frappe.session.user,'locked_at':now_datetime()})
     doc.insert(ignore_permissions=True)
     return {'name':doc.name,'period_start':start,'period_end':end}
+
+
 

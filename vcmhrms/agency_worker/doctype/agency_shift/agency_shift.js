@@ -7,7 +7,7 @@ frappe.ui.form.on('Agency Shift', {
 });
 function update_hint(frm) {
     frm.set_intro(frm.doc.mode === 'Flexy'
-        ? __('Flexy: attendance is based on worked duration. Start and End Time anchor punches to the correct duty; Late Entry and Early Exit grace are not applicable.')
+        ? __('Flexy: attendance is based only on First In to Last Out duration, Required Hours, and Half Day Hours. The roster date is the punch-matching day.')
         : __('Fixed: Start and End Time control punctuality. End time at or before start time means the duty ends the following day.'));
 }
 

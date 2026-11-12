@@ -120,6 +120,14 @@ def finalize_pending_attendance():
                 greatest(coalesce(rd.planned_after_ot_hours,0),coalesce(s.max_after_ot_capture_hours,0))*60
                     + coalesce(s.late_minutes,0),rd.end_datetime)<=%s
         limit 2000''',now_datetime(),as_dict=True)
+    off_rows=frappe.db.sql('''select distinct a.roster
+        from `tabAgency Attendance` a
+        join `tabAgency Attendance Duty` d on d.parent=a.name
+        join `tabAgency Roster` r on r.name=a.roster
+        where r.day_type='Weekly Off' and d.status='Pending' and r.roster_date<%s
+        limit 2000''',getdate(now_datetime()),as_dict=True)
+    roster_names={row.roster for row in rows}
+    rows.extend(row for row in off_rows if row.roster not in roster_names)
     recalculated=0
     failed=0
     for row in rows:
@@ -138,4 +146,6 @@ def run_pending_finalization():
     if frappe.session.user=='Guest' or not ({'System Manager','Agency Worker Manager'} & set(frappe.get_roles())):
         frappe.throw('Agency Worker Manager or System Manager role required.',frappe.PermissionError)
     return finalize_pending_attendance()
+
+
 

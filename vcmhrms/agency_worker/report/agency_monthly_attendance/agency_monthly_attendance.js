@@ -54,9 +54,10 @@ MK Security`},
         value=default_formatter(value,row,column,data);
         if (!column.fieldname.startsWith('day_')) return value;
         const raw=String(data[column.fieldname] || '');
+        if (raw.startsWith('M') || raw.startsWith('A')) return `<span style="color:#c0392b;font-weight:600">${value}</span>`;
+        if (raw.includes('OT')) return `<span style="color:#2563eb;font-weight:600">${value}</span>`;
         if ((data.holiday_fields||[]).includes(column.fieldname)) return `<span style="color:${data.holiday_colour || '#6f42c1'};font-weight:600">${value}</span>`;
-        if (raw.startsWith('A') || raw.startsWith('NR')) return `<span style="color:#c0392b;font-weight:600">${value}</span>`;
-        if (raw.startsWith('HD') || raw.startsWith('PD')) return `<span style="color:#b7791f;font-weight:600">${value}</span>`;
+        if (raw.startsWith('HD')) return `<span style="color:#b7791f;font-weight:600">${value}</span>`;
         if (raw.startsWith('P') || raw.includes('✓')) return `<span style="color:#26734d">${value}</span>`;
         return value;
     }

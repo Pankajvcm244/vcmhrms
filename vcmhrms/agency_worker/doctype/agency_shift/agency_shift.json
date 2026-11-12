@@ -26,19 +26,21 @@
       "fieldname": "start_time",
       "label": "Start Time",
       "fieldtype": "Time",
-      "reqd": 1
+      "depends_on": "eval:doc.mode=='Fixed'",
+      "mandatory_depends_on": "eval:doc.mode=='Fixed'"
     },
     {
       "fieldname": "end_time",
       "label": "End Time",
       "fieldtype": "Time",
-      "reqd": 1
+      "depends_on": "eval:doc.mode=='Fixed'",
+      "mandatory_depends_on": "eval:doc.mode=='Fixed'"
     },
     {
       "fieldname": "required_hours",
       "label": "Required Hours",
       "fieldtype": "Float",
-      "description": "Minimum net worked duration required for Present after deducting Break Minutes. This shift value—not a fixed 8 hours—controls attendance. Enter decimal hours here; operational pages display HH:MM.",
+      "description": "Minimum worked duration required for Present. This shift value—not a fixed 8 hours—controls attendance. Enter decimal hours here; operational pages display HH:MM.",
       "default": 8,
       "reqd": 1
     },
@@ -55,7 +57,9 @@
       "label": "Break Minutes",
       "fieldtype": "Int",
       "default": 0,
-      "description": "Unpaid break deducted once from the elapsed time between First In and Last Out. Example: 09:00–18:00 with 60 break minutes gives 08:00 worked. Keep 0 when no automatic break deduction is required."
+      "hidden": 1,
+      "read_only": 1,
+      "description": "Deprecated compatibility field. Worked duration is First In to Last Out without an automatic break deduction."
     },
     {
       "fieldname": "early_minutes",
@@ -78,7 +82,8 @@
       "label": "Maximum Before OT Capture Hours",
       "fieldtype": "Float",
       "default": 4,
-      "reqd": 1,
+      "depends_on": "eval:doc.mode=='Fixed'",
+      "mandatory_depends_on": "eval:doc.mode=='Fixed'",
       "description": "How far before shift start the system may search for this duty's punches. It is a punch-matching safety window, not approved OT. Keep it only as large as operationally necessary to avoid matching another shift's punches."
     },
     {
@@ -86,7 +91,8 @@
       "label": "Maximum After OT Capture Hours",
       "fieldtype": "Float",
       "default": 4,
-      "reqd": 1,
+      "depends_on": "eval:doc.mode=='Fixed'",
+      "mandatory_depends_on": "eval:doc.mode=='Fixed'",
       "description": "How far after shift end the system may search for this duty's punches. It is a punch-matching safety window, not approved OT. The attendance remains Pending until this window closes unless processed under an eligible rule."
     },
     {

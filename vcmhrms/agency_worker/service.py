@@ -23,7 +23,7 @@ def recalculate(roster):
         duties.append(dict(id=row.name, shift=row.shift, mode=shift.mode or 'Fixed', start=get_datetime(row.start_datetime),
             end=get_datetime(row.end_datetime), early=shift.early_minutes or 0,
             late=shift.late_minutes or 0, required_hours=shift.required_hours,
-            half_day_hours=shift.half_day_hours or 0, break_minutes=shift.break_minutes or 0,
+            half_day_hours=shift.half_day_hours or 0, break_minutes=0,
             planned_before_ot_hours=row.planned_before_ot_hours or 0,
             planned_after_ot_hours=row.planned_after_ot_hours or 0,
             ot_reason=row.ot_reason,
@@ -45,7 +45,7 @@ def recalculate(roster):
             duties.append(dict(id=row.name,shift=row.shift,mode=shift.mode or 'Fixed',start=get_datetime(row.start_datetime),
                 end=get_datetime(row.end_datetime),early=shift.early_minutes or 0,late=shift.late_minutes or 0,
                 required_hours=shift.required_hours,half_day_hours=shift.half_day_hours or 0,
-                break_minutes=shift.break_minutes or 0,
+                break_minutes=0,
                 planned_before_ot_hours=row.planned_before_ot_hours or 0,
                 planned_after_ot_hours=row.planned_after_ot_hours or 0,
                 ot_reason=row.ot_reason,
@@ -59,7 +59,26 @@ def recalculate(roster):
     doc.update(dict(roster=roster.name,worker=roster.worker,worker_code=roster.worker,
                     attendance_date=roster.roster_date,
                     calculated_at=now_datetime()))
-    current_results=results[:len(roster.duties)]
+    if roster.day_type=='Weekly Off':
+        off_start=get_datetime(roster.roster_date)
+        off_end=get_datetime(add_days(roster.roster_date,1))
+        off_punches=sorted(set(p for p in punches if off_start<=p<off_end))
+        current_results=[]
+        if off_punches:
+            off_result=dict(roster_duty=f'OFF-{roster.name}',shift=None,first_in=off_punches[0],last_out=None,
+                worked_hours=0,required_hours=0,shortfall_hours=0,late_entry=0,early_exit=0,
+                planned_before_ot_hours=0,actual_before_ot_hours=0,planned_after_ot_hours=0,
+                actual_after_ot_hours=0,ot_reason='Worked on Weekly Off',status='Pending',exception='')
+            if len(off_punches)>=2:
+                worked=max(0,(off_punches[-1]-off_punches[0]).total_seconds()/3600)
+                eligible_ot=worked if worked>=1 else 0
+                off_result.update(last_out=off_punches[-1],worked_hours=round(worked,2),status='Present',
+                    actual_after_ot_hours=round(eligible_ot,2))
+            elif now_datetime()>=off_end:
+                off_result.update(status='Needs Review',exception='Only one punch on Weekly Off; missing counterpart.')
+            current_results.append(off_result)
+    else:
+        current_results=results[:len(roster.duties)]
     old_exceptions={r.roster_duty:dict(corrected_first_in=r.corrected_first_in,
         corrected_last_out=r.corrected_last_out,status_override=r.status_override,
         exception_reason=r.exception_reason,exception_by=r.exception_by,exception_at=r.exception_at)
@@ -108,12 +127,6 @@ def recalculate(roster):
                 row.punch_approved_by=approval.get('punch_by')
                 row.punch_approved_at=approval.get('punch_at')
                 row.punch_approval_remarks=approval.get('punch_remarks')
-    off_start=get_datetime(roster.roster_date)
-    off_end=get_datetime(add_days(roster.roster_date,1))
-    if roster.day_type == 'Weekly Off' and any(off_start<=p<off_end for p in punches):
-        # Calendar-day presence on an off is only a warning; overnight previous duty may explain it.
-        if not doc.review_notes:
-            doc.review_notes = 'Review punches on weekly off, including previous overnight duty.'
     doc.flags.workforce_calculation=True
     doc.save(ignore_permissions=True)
     return doc.name

@@ -9,6 +9,16 @@ from vcmhrms.agency_worker.period_lock import period_dates
 from frappe.utils import get_datetime
 
 
+def _shift_times(template,day):
+    if template.mode=='Flexy':
+        begin=get_datetime(day)
+        return begin,begin+timedelta(days=1)
+    begin=get_datetime(f'{day} {template.start_time}')
+    finish=get_datetime(f'{day} {template.end_time}')
+    if finish<=begin: finish+=timedelta(days=1)
+    return begin,finish
+
+
 @frappe.whitelist()
 def get_month(month,budget_location,worker=None,agency=None):
     check_budget_location(budget_location)
@@ -54,9 +64,7 @@ def allocate_range(worker,budget_location,from_date,to_date,day_type,shift=None,
         doc.update(dict(worker=worker,budget_location=budget_location,roster_date=day,day_type=day_type))
         doc.set('duties',[])
         if template:
-            begin=get_datetime(f'{day} {template.start_time}')
-            finish=get_datetime(f'{day} {template.end_time}')
-            if finish<=begin: finish+=timedelta(days=1)
+            begin,finish=_shift_times(template,day)
             doc.append('duties',dict(shift=shift,start_datetime=begin,end_datetime=finish,
                 planned_before_ot_hours=float(planned_before_ot_hours or 0),
                 planned_after_ot_hours=float(planned_after_ot_hours or 0),ot_reason=ot_reason))
@@ -133,9 +141,7 @@ def allocate_bulk_job(workers,budget_location,from_date,to_date,shift,weekly_off
                 doc.update(dict(worker=worker,budget_location=budget_location,roster_date=day,day_type=day_type))
                 doc.set('duties',[])
                 if day_type=='Duty':
-                    begin=get_datetime(f'{day} {template.start_time}')
-                    finish=get_datetime(f'{day} {template.end_time}')
-                    if finish<=begin: finish+=timedelta(days=1)
+                    begin,finish=_shift_times(template,day)
                     doc.append('duties',dict(shift=shift,start_datetime=begin,end_datetime=finish,
                                              planned_before_ot_hours=0,planned_after_ot_hours=0))
                 doc.save(ignore_permissions=True)

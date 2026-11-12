@@ -17,8 +17,9 @@ from vcmhrms.agency_worker.duration import hours_to_hhmm
 
 
 def _day_status(items):
-    statuses=[item.status or 'Pending' for item in items]
-    if any(s=='Needs Review' for s in statuses): return 'NR'
+    statuses=['Present' if item.status=='Needs Review' and item.punch_approval_status=='Approved'
+        else (item.status or 'Pending') for item in items]
+    if any(s=='Needs Review' for s in statuses): return 'M'
     if any(s=='Pending' for s in statuses): return 'PD'
     if all(s=='Present' for s in statuses): return 'P'
     if all(s=='Absent' for s in statuses): return 'A'
@@ -81,6 +82,8 @@ def execute(filters=None):
     columns += [dict(fieldname='present_days',label='Present',fieldtype='Int',width=75),
         dict(fieldname='half_days',label='Half Days',fieldtype='Int',width=80),
         dict(fieldname='absent_days',label='Absent',fieldtype='Int',width=75),
+        dict(fieldname='off_days',label='Off Days',fieldtype='Int',width=75),
+        dict(fieldname='total_duty',label='Total Duty',fieldtype='Int',width=85),
         dict(fieldname='approved_ot',label='Approved OT',fieldtype='Data',width=95)]
     if not workers: return columns,[],f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. ✓ means no supervisor action is pending.'
     names=[w.name for w in workers]
@@ -89,7 +92,8 @@ def execute(filters=None):
     if rosters:
         roster_names=[r.name for r in rosters]; placeholders=','.join(['%s']*len(roster_names))
         records=frappe.db.sql(f"""select r.worker,r.roster_date,d.status,d.worked_hours,d.approved_before_ot_hours+
-            d.approved_after_ot_hours approved_ot,d.ot_approval_status,d.punch_approval_status,
+            d.approved_after_ot_hours approved_ot,d.actual_before_ot_hours,d.actual_after_ot_hours,
+            d.ot_approval_status,d.punch_approval_status,
             d.late_entry,d.early_exit from `tabAgency Roster` r join `tabAgency Attendance` a on a.roster=r.name
             join `tabAgency Attendance Duty` d on d.parent=a.name where r.name in ({placeholders})""",tuple(roster_names),as_dict=True)
         for x in records: by_day[(x.worker,getdate(x.roster_date))].append(x)
@@ -108,7 +112,7 @@ def execute(filters=None):
                 fields=['holiday_date']))
     data=[]
     for worker in workers:
-        row=frappe._dict(**worker,present_days=0,half_days=0,absent_days=0,approved_ot=0,
+        row=frappe._dict(**worker,present_days=0,half_days=0,absent_days=0,off_days=0,total_duty=0,approved_ot=0,
             holiday_colour=(agency_meta.get(worker.agency) or {}).get('holiday_colour') or '#6f42c1',
             holiday_fields=[])
         for i,date in enumerate(dates,1):
@@ -116,7 +120,20 @@ def execute(filters=None):
             items=by_day.get((worker.name,date),[])
             is_holiday=date in holidays.get(worker.agency,set())
             if is_holiday: row.holiday_fields.append(fieldname)
-            if (worker.name,date) in offs: code='OFF ✓'
+            if (worker.name,date) in offs:
+                row.off_days+=1
+                if any(x.status=='Needs Review' and x.punch_approval_status!='Approved' for x in items):
+                    code='M'
+                elif any(float(x.actual_before_ot_hours or 0)+float(x.actual_after_ot_hours or 0)>=1 for x in items):
+                    code='OFF/OT'
+                    if any(x.ot_approval_status in ('Approved','Rejected') for x in items) and not any(
+                            x.ot_approval_status=='Pending' or x.punch_approval_status=='Pending' for x in items):
+                        code+=' ✓'
+                    row.approved_ot+=sum(float(x.approved_ot or 0) for x in items)
+                else:
+                    code='OFF'
+                row[fieldname]=code
+                continue
             elif not items:
                 row[fieldname]='—'
                 continue
@@ -129,14 +146,20 @@ def execute(filters=None):
                 elif code=='HD': row.half_days+=1
                 elif code=='A': row.absent_days+=1
                 row.approved_ot+=sum(float(x.approved_ot or 0) for x in items)
-                pending=any((x.status in ('Pending','Needs Review') or x.ot_approval_status=='Pending' or x.punch_approval_status=='Pending') for x in items)
-                code+=('' if pending else ' ✓')
+                ot_statuses={x.ot_approval_status for x in items}
+                if 'Pending' in ot_statuses: code+=' OT?'
+                elif 'Approved' in ot_statuses: code+=' OT'
+                pending=any((x.status=='Pending' or (x.status=='Needs Review' and x.punch_approval_status!='Approved')
+                    or x.ot_approval_status=='Pending' or x.punch_approval_status=='Pending') for x in items)
+                reviewed=any(x.punch_approval_status=='Approved' or x.ot_approval_status in ('Approved','Rejected') for x in items)
+                if reviewed and not pending: code+=' ✓'
             row[fieldname]=code
+        row.total_duty=row.present_days+row.off_days+row.half_days+row.absent_days
         row.approved_ot=hours_to_hhmm(row.approved_ot); data.append(row)
     message=(f'Attendance period: {start:%d-%m-%Y} to {end:%d-%m-%Y}. '
         'Codes: P = Present; HD = Half Day; A = Absent; OFF = Weekly Off; '
-        'NR = Needs Review; — = No roster. Pending attendance is left blank until finalized. '
-        '✓ = no pending punch or OT action. Agency holidays use the agency holiday colour.')
+        'M = Missing Punch; OT = Overtime; — = No roster. Pending attendance is left blank until finalized. '
+        '✓ = a punch or OT exception was reviewed. Agency holidays use the agency holiday colour.')
     return columns,data,message
 
 

@@ -10,7 +10,7 @@ def evaluate_times(result,duty,first,last,complete=True):
     if not first or not last or last<=first:
         result.update(status='Needs Review',exception='A valid first and last punch pair is required.')
         return result
-    hours=max(0,(last-first).total_seconds()/3600-duty['break_minutes']/60)
+    hours=max(0,(last-first).total_seconds()/3600)
     required=float(duty['required_hours'])
     half_day=float(duty.get('half_day_hours') or required/2)
     raw_before_ot=max(0,(duty['start']-first).total_seconds()/3600)
