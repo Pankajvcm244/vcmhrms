@@ -51,6 +51,16 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
             loadRoster();
         }
     });
+    const assignedToMe = page.add_field({
+        fieldname: 'assigned_to_me',
+        label: 'My Assigned Staff',
+        fieldtype: 'Check',
+        default: frappe.user_roles.includes('Agency Roster Manager') ? 1 : 0,
+        change: () => {
+            selectedWorkerNames.clear();
+            loadRoster();
+        }
+    });
     const agency = page.add_field({
         fieldname: 'agency',
         label: 'Agency',
@@ -192,7 +202,8 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
             args: {
                 month: selectedMonth,
                 budget_location: selectedLocation,
-                agency: agency.get_value()
+                agency: agency.get_value(),
+                assigned_to_me: assignedToMe.get_value()
             }
         });
         if (request !== loadRequest) return;
@@ -207,7 +218,7 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
             `${row.worker}|${String(row.roster_date).slice(0, 10)}`,
             row
         ]));
-        let html = `<p><b>${esc(String(data.period_start).slice(0, 10))}</b> to <b>${esc(String(data.period_end).slice(0, 10))}</b>. Select staff across searches, then click <b>Bulk Assign Simple Shift</b>. The selection remains while you search. Click a day to edit OT, multiple shifts or other exceptions. OFF = weekly off.</p>`;
+        let html = `<p><b>${esc(String(data.period_start).slice(0, 10))}</b> to <b>${esc(String(data.period_end).slice(0, 10))}</b>. ${data.assigned_to_me ? '<b>My Assigned Staff</b> is active. ' : ''}Select staff across searches, then click <b>Bulk Assign Simple Shift</b>. The selection remains while you search. Click a day to edit OT, multiple shifts or other exceptions. OFF = weekly off.</p>`;
         html += '<table class="table table-bordered"><thead><tr>';
         html += '<th><input type="checkbox" class="select-all-workers" title="Select all visible staff"></th>';
         html += '<th>Agency Staff Name</th><th>Agency Staff ID</th><th>Agency</th>';

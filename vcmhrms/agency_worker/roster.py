@@ -20,29 +20,38 @@ def _shift_times(template,day):
 
 
 @frappe.whitelist()
-def get_month(month,budget_location,worker=None,agency=None):
+def get_month(month,budget_location,worker=None,agency=None,assigned_to_me=0):
     check_budget_location(budget_location)
     start,end=period_dates(str(month))
-    worker_filters={'budget_location':budget_location,'status':'Active'}
-    if worker: worker_filters['name']=worker
-    if agency: worker_filters['agency']=agency
-    workers=frappe.get_list('Agency Worker',filters=worker_filters,
-        fields=['name','worker_name','staff_id','agency','worker_role','department','budget_location'],
-        limit_page_length=0,order_by='worker_name')
-    worker_names=[row.name for row in workers]
     dates=[]
     day=start
     while day<=end:
         dates.append(day)
         day+=timedelta(days=1)
+    worker_filters={'budget_location':budget_location,'status':'Active'}
+    if worker: worker_filters['name']=worker
+    if agency: worker_filters['agency']=agency
+    if frappe.utils.cint(assigned_to_me):
+        assigned_workers=frappe.get_all('Agency Worker Roster Manager',filters={
+            'user':frappe.session.user,'parenttype':'Agency Worker'},pluck='parent')
+        if not assigned_workers:
+            return dict(workers=[],rosters=[],dates=dates,period_start=start,period_end=end,
+                assigned_to_me=1)
+        worker_filters['name']=['in',assigned_workers]
+    workers=frappe.get_list('Agency Worker',filters=worker_filters,
+        fields=['name','worker_name','staff_id','agency','worker_role','department','budget_location'],
+        limit_page_length=0,order_by='worker_name')
+    worker_names=[row.name for row in workers]
     if not worker_names:
-        return dict(workers=[],rosters=[],dates=dates,period_start=start,period_end=end)
+        return dict(workers=[],rosters=[],dates=dates,period_start=start,period_end=end,
+            assigned_to_me=frappe.utils.cint(assigned_to_me))
     rosters=frappe.get_list('Agency Roster',filters={'budget_location':budget_location,
         'worker':['in',worker_names],'roster_date':['between',[start,end]]},
         fields=['name','worker','roster_date','day_type'],limit_page_length=0)
     for row in rosters:
         row['shifts']=[d.shift for d in frappe.get_doc('Agency Roster',row.name).duties]
-    return dict(workers=workers,rosters=rosters,dates=dates,period_start=start,period_end=end)
+    return dict(workers=workers,rosters=rosters,dates=dates,period_start=start,period_end=end,
+        assigned_to_me=frappe.utils.cint(assigned_to_me))
 
 
 @frappe.whitelist(methods=['POST'])
