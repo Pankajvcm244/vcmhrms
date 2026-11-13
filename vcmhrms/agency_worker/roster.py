@@ -12,7 +12,7 @@ from frappe.utils import get_datetime
 def _shift_times(template,day):
     if template.mode=='Flexy':
         begin=get_datetime(day)
-        return begin,begin+timedelta(days=1)
+        return begin,begin+timedelta(days=1)-timedelta(seconds=1)
     begin=get_datetime(f'{day} {template.start_time}')
     finish=get_datetime(f'{day} {template.end_time}')
     if finish<=begin: finish+=timedelta(days=1)

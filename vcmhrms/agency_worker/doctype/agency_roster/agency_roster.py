@@ -38,6 +38,10 @@ class AgencyRoster(Document):
             frappe.throw('Add at least one duty.')
         windows=[]
         for row in self.duties:
+            shift=frappe.get_cached_doc('Agency Shift',row.shift)
+            if shift.mode=='Flexy':
+                row.start_datetime=get_datetime(date)
+                row.end_datetime=row.start_datetime+timedelta(days=1)-timedelta(seconds=1)
             start,end=get_datetime(row.start_datetime),get_datetime(row.end_datetime)
             if getdate(start)!=date or end<=start or (end-start).total_seconds()>86400:
                 frappe.throw('Duty must start on roster date and last more than zero and at most 24 hours.')
@@ -70,5 +74,7 @@ class AgencyRoster(Document):
     def on_trash(self):
         assert_unlocked(self.roster_date,self.budget_location)
         require_roster_manager(self.worker)
+
+
 
 
