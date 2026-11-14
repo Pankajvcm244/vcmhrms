@@ -26,6 +26,12 @@ AGENCY_REPORTS = (
 )
 
 AGENCY_WORKSPACE = "Agency HR Worker"
+AGENCY_STAFFING_DEFAULT_ROLES = (
+    "VCM Pay Admin",
+    "VCM Pay Manager",
+    "ERP Manager",
+    "System Manager",
+)
 
 
 def after_migrate():
@@ -49,7 +55,23 @@ def after_migrate():
     _sync_agency_page_and_report_roles()
     _backfill_roster_worker_names()
     _sync_agency_workspace()
+    _ensure_agency_staffing_settings()
     _fix_invalid_desk_home_page()
+
+
+def _ensure_agency_staffing_settings():
+    """Seed the server-controlled mobile dashboard settings without overwriting later edits."""
+    settings=frappe.get_single("Agency Staffing Settings")
+    changed=False
+    if not settings.budget_location:
+        settings.budget_location="VRN"; changed=True
+    if not settings.allowed_roles:
+        for role in AGENCY_STAFFING_DEFAULT_ROLES:
+            if frappe.db.exists("Role",role):
+                settings.append("allowed_roles",{"role":role})
+        changed=True
+    if changed:
+        settings.save(ignore_permissions=True)
 
 
 def _replace_allowed_roles(parenttype, parent):
@@ -127,6 +149,8 @@ def _fix_invalid_desk_home_page():
     if frappe.db.get_default("desktop:home_page") == "home":
         frappe.db.set_default("desktop:home_page", "workspace")
         frappe.clear_cache()
+
+
 
 
 

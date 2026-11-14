@@ -66,7 +66,19 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
         label: 'Agency',
         fieldtype: 'Link',
         options: 'Agency',
+        reqd: 1,
         change: () => loadRoster()
+    });
+    const allAgencies = page.add_field({
+        fieldname: 'all_agencies',
+        label: 'All Agencies',
+        fieldtype: 'Check',
+        default: 0,
+        change: () => {
+            agency.df.read_only = Boolean(allAgencies.get_value());
+            agency.refresh();
+            loadRoster();
+        }
     });
     const workerSearch = page.add_field({
         fieldname: 'worker_search',
@@ -194,7 +206,13 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
     async function loadRoster() {
         const selectedMonth = month.get_value();
         const selectedLocation = budget_location.get_value();
-        if (!selectedMonth || !selectedLocation) return;
+        const selectedAgency = agency.get_value();
+        const loadAllAgencies = Boolean(allAgencies.get_value());
+        if (!selectedMonth || !selectedLocation || (!selectedAgency && !loadAllAgencies)) {
+            loadedData = null;
+            body.html(`<div class="text-muted p-3">${__('Select an Agency to load its staff roster.')}</div>`);
+            return;
+        }
         const request = ++loadRequest;
         body.html('<div class="text-muted p-3">Loading roster…</div>');
         const {message: data} = await frappe.call({
@@ -202,7 +220,7 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
             args: {
                 month: selectedMonth,
                 budget_location: selectedLocation,
-                agency: agency.get_value(),
+                agency: loadAllAgencies ? null : selectedAgency,
                 assigned_to_me: assignedToMe.get_value()
             }
         });
@@ -278,7 +296,17 @@ frappe.pages['ag-monthly-roster'].on_page_load = function(wrapper) {
         frappe.msgprint(__(`Bulk roster completed: ${message.created} created, ${message.replaced} replaced, ${message.skipped} skipped, ${message.failed_workers} workers failed.`));
         loadRoster();
     });
-    setTimeout(loadRoster, 0);
+    setTimeout(async () => {
+        const {message: defaultAgency} = await frappe.call({
+            method: 'vcmhrms.agency_worker.roster.get_default_agency',
+            args: {
+                budget_location: budget_location.get_value(),
+                assigned_to_me: assignedToMe.get_value()
+            }
+        });
+        if (defaultAgency) await agency.set_value(defaultAgency);
+        else loadRoster();
+    }, 0);
 };
 
 

@@ -1,0 +1,22 @@
+{
+  "doctype": "DocType",
+  "name": "Agency Staffing Allowed Role",
+  "module": "Agency Worker",
+  "istable": 1,
+  "editable_grid": 1,
+  "field_order": ["role"],
+  "fields": [
+    {
+      "fieldname": "role",
+      "label": "Role",
+      "fieldtype": "Link",
+      "options": "Role",
+      "reqd": 1,
+      "in_list_view": 1
+    }
+  ],
+  "permissions": [],
+  "actions": [],
+  "links": [],
+  "states": []
+}

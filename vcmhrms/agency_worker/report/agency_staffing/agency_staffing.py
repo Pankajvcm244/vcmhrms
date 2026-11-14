@@ -10,6 +10,33 @@ from vcmhrms.agency_worker.duration import hours_to_hhmm
 from vcmhrms.agency_worker.service import check_budget_location
 
 
+DEFAULT_MOBILE_ROLES={'VCM Pay Admin','VCM Pay Manager','ERP Manager','System Manager'}
+
+
+def _mobile_settings():
+    if frappe.db.exists('DocType','Agency Staffing Settings'):
+        settings=frappe.get_single('Agency Staffing Settings')
+        roles={row.role for row in settings.allowed_roles if row.role} or DEFAULT_MOBILE_ROLES
+        return frappe._dict(enabled=frappe.utils.cint(settings.enabled),
+            budget_location=settings.budget_location or 'VRN',roles=roles)
+    return frappe._dict(enabled=1,budget_location='VRN',roles=DEFAULT_MOBILE_ROLES)
+
+
+def _has_mobile_access(settings=None):
+    settings=settings or _mobile_settings()
+    return bool(settings.enabled and frappe.session.user!='Guest'
+        and settings.roles & set(frappe.get_roles()))
+
+
+@frappe.whitelist()
+def get_mobile_settings():
+    """Small bootstrap payload used by the mobile app to render server-controlled navigation."""
+    settings=_mobile_settings()
+    allowed=_has_mobile_access(settings)
+    return {'enabled':bool(settings.enabled),'has_access':allowed,
+        'budget_location':settings.budget_location if allowed else None}
+
+
 def _period(value):
     match=re.fullmatch(r'(\d{4})-(\d{2})',value or '')
     if not match:
@@ -80,17 +107,73 @@ def execute(filters=None):
 
 
 @frappe.whitelist()
-def get_dashboard(payroll_cycle,budget_location='VRN',agency=None,department=None,worker=None):
+def get_dashboard(payroll_cycle,budget_location=None,agency=None,department=None,worker=None):
     """Permission-checked mobile payload for the Agency Staffing dashboard."""
-    filters=frappe._dict(payroll_cycle=payroll_cycle,budget_location=budget_location,
-        agency=agency,department=department,worker=worker)
-    columns,data,message,chart,summary=execute(filters)
+    settings=_mobile_settings()
+    if not _has_mobile_access(settings):
+        frappe.throw('VCM Pay or ERP management access is required.',frappe.PermissionError)
+    budget_location=budget_location or settings.budget_location
+    start,end=_period(payroll_cycle)
+    from vcmhrms.agency_worker.report.agency_monthly_attendance.agency_monthly_attendance import execute as monthly_execute
+    _,data,message=monthly_execute(frappe._dict(month=f'{end.month:02d}',year=str(end.year),
+        budget_location=budget_location,agency=agency,department=department,worker=worker))
+    worker_names=[row.name for row in data]
+    reviews={}
+    if worker_names:
+        review_rows=frappe.db.sql("""
+            select a.worker,
+              count(distinct case when d.punch_approval_status='Approved'
+                or d.corrected_first_in is not null or d.corrected_last_out is not null
+                or coalesce(d.status_override,'')!='' then a.attendance_date end) modified_attendance,
+              count(distinct case when d.punch_approval_status='Pending'
+                and d.status in ('Half Day','Absent','Needs Review') then a.attendance_date end) pending_reviews
+            from `tabAgency Attendance` a
+            join `tabAgency Attendance Duty` d on d.parent=a.name
+            where a.worker in %(workers)s and a.attendance_date between %(start)s and %(end)s
+            group by a.worker
+        """,{'workers':worker_names,'start':start,'end':end},as_dict=True)
+        reviews={row.worker:row for row in review_rows}
+    for row in data:
+        review=reviews.get(row.name) or {}
+        row.modified_attendance=int(review.get('modified_attendance') or 0)
+        row.pending_reviews=int(review.get('pending_reviews') or 0)
+        # Compatibility names used by the original web/mobile dashboard contract.
+        row.approved_nr_reviews=row.modified_attendance
+        row.pending_nr_reviews=row.pending_reviews
+        row.approved_ot_duration=row.approved_ot
     workers=frappe.get_list('Agency Worker',filters={'budget_location':budget_location},
         fields=['name','worker_name','agency','department'],order_by='worker_name',limit_page_length=0)
+    cycle_end=date.today()
+    cycle_year=cycle_end.year
+    cycle_month=cycle_end.month+(1 if cycle_end.day>=26 else 0)
+    if cycle_month==13:
+        cycle_month=1; cycle_year+=1
+    cycles=[]
+    for offset in range(3):
+        month=cycle_month-offset; year=cycle_year
+        while month<=0:
+            month+=12; year-=1
+        cycle_start,cycle_finish=_period(f'{year:04d}-{month:02d}')
+        cycles.append({'value':f'{year:04d}-{month:02d}',
+            'label':f'{cycle_finish:%B %Y} ({cycle_start:%d-%m-%Y} to {cycle_finish:%d-%m-%Y})'})
+    total_ot_minutes=0
+    for row in data:
+        hours,minutes=(str(row.approved_ot or '00:00').split(':')+['0'])[:2]
+        total_ot_minutes+=int(hours or 0)*60+int(minutes or 0)
+    summary=[
+        {'label':'Present','value':sum(int(row.present_days or 0) for row in data)},
+        {'label':'Half Day','value':sum(int(row.half_days or 0) for row in data)},
+        {'label':'Absent','value':sum(int(row.absent_days or 0) for row in data)},
+        {'label':'OFF','value':sum(int(row.off_days or 0) for row in data)},
+        {'label':'Modified','value':sum(row.modified_attendance for row in data)},
+        {'label':'Pending Review','value':sum(row.pending_reviews for row in data)},
+        {'label':'Approved OT','value':f'{total_ot_minutes//60:02d}:{total_ot_minutes%60:02d}'},
+    ]
     return {
         'data':data,
         'message':message,
         'summary':summary,
+        'payroll_cycles':cycles,
         'options':{
             'agencies':sorted({row.agency for row in workers if row.agency}),
             'departments':sorted({row.department for row in workers if row.department}),

@@ -53,15 +53,23 @@ class AgencyRoster(Document):
                 frappe.throw('Planned before/after OT cannot exceed 12 hours per duty.')
             if (before_ot or after_ot) and not row.ot_reason:
                 frappe.throw('Enter an OT reason when planning before-shift or after-shift OT.')
-            windows.append((start-timedelta(hours=before_ot),end+timedelta(hours=after_ot)))
+            windows.append((start-timedelta(hours=before_ot),end+timedelta(hours=after_ot),shift.mode=='Flexy'))
         neighbours=frappe.get_all('Agency Roster',filters={'worker':self.worker,
             'roster_date':['between',[add_days(date,-1),add_days(date,1)]],'name':['!=',self.name]},pluck='name')
         for name in neighbours:
-            windows.extend((get_datetime(r.start_datetime)-timedelta(hours=r.planned_before_ot_hours or 0),
-                            get_datetime(r.end_datetime)+timedelta(hours=r.planned_after_ot_hours or 0))
-                for r in frappe.get_doc('Agency Roster',name).duties)
-        windows.sort()
-        if any(a[1]>b[0] for a,b in zip(windows,windows[1:])):
+            for row in frappe.get_doc('Agency Roster',name).duties:
+                shift=frappe.get_cached_doc('Agency Shift',row.shift)
+                windows.append((
+                    get_datetime(row.start_datetime)-timedelta(hours=row.planned_before_ot_hours or 0),
+                    get_datetime(row.end_datetime)+timedelta(hours=row.planned_after_ot_hours or 0),
+                    shift.mode=='Flexy',
+                ))
+        # Flexy is a calendar-day fallback allocation and may coexist with a
+        # timed shift. Timed duties must still not overlap each other, and two
+        # Flexy duties remain invalid.
+        windows.sort(key=lambda window:window[0])
+        if any(left[1]>right[0] and (left[2]==right[2] or not (left[2] or right[2]))
+               for index,left in enumerate(windows) for right in windows[index+1:]):
             frappe.throw('Duty or planned OT time overlaps another allocation.')
 
     def on_update(self):

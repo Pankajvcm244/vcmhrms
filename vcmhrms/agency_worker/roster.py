@@ -9,6 +9,22 @@ from vcmhrms.agency_worker.period_lock import period_dates
 from frappe.utils import get_datetime
 
 
+@frappe.whitelist()
+def get_default_agency(budget_location,assigned_to_me=0):
+    """Return a small, predictable initial roster scope instead of loading every worker."""
+    check_budget_location(budget_location)
+    filters={'budget_location':budget_location,'status':'Active','agency':['is','set']}
+    if frappe.utils.cint(assigned_to_me):
+        assigned_workers=frappe.get_all('Agency Worker Roster Manager',filters={
+            'user':frappe.session.user,'parenttype':'Agency Worker'},pluck='parent')
+        if not assigned_workers:
+            return None
+        filters['name']=['in',assigned_workers]
+    row=frappe.get_list('Agency Worker',filters=filters,fields=['agency'],
+        order_by='agency asc',limit_page_length=1)
+    return row[0].agency if row else None
+
+
 def _shift_times(template,day):
     if template.mode=='Flexy':
         begin=get_datetime(day)

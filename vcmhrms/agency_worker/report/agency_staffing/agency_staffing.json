@@ -8,9 +8,8 @@
   "is_standard": "Yes",
   "roles": [
     {"role": "System Manager"},
-    {"role": "Agency Worker Manager"},
-    {"role": "Agency Roster Manager"},
-    {"role": "Agency Worker Supervisor"},
-    {"role": "ERP Manager"}
+    {"role": "ERP Manager"},
+    {"role": "VCM Pay Admin"},
+    {"role": "VCM Pay Manager"}
   ]
 }

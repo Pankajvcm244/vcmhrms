@@ -1,0 +1,47 @@
+{
+  "doctype": "DocType",
+  "name": "Agency Staffing Settings",
+  "module": "Agency Worker",
+  "issingle": 1,
+  "track_changes": 1,
+  "field_order": ["enabled", "budget_location", "allowed_roles_section", "allowed_roles"],
+  "fields": [
+    {
+      "fieldname": "enabled",
+      "label": "Enable Agency Staffing in VCM ERP Mobile App",
+      "fieldtype": "Check",
+      "default": "1"
+    },
+    {
+      "fieldname": "budget_location",
+      "label": "Default Budget Location",
+      "fieldtype": "Link",
+      "options": "Budget Location",
+      "default": "VRN",
+      "reqd": 1
+    },
+    {
+      "fieldname": "allowed_roles_section",
+      "label": "Mobile Access",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "allowed_roles",
+      "label": "Allowed Roles",
+      "fieldtype": "Table",
+      "options": "Agency Staffing Allowed Role",
+      "description": "Only users having at least one listed role can see or open Agency Staffing in the mobile app."
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1
+    }
+  ],
+  "actions": [],
+  "links": [],
+  "states": []
+}
